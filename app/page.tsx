@@ -25,9 +25,7 @@ type Concept = {
   concept_id?: string;
 
   subject: string;
-
   class: number;
-
   chapter_name: string;
 
   concept_name: string;
@@ -86,6 +84,9 @@ export default function Home() {
   const [selected, setSelected] =
     useState<any>(null);
 
+  const [search, setSearch] =
+    useState("");
+
   const [expandedPath, setExpandedPath] =
     useState<any>({
       subject: "",
@@ -129,8 +130,6 @@ export default function Home() {
     const nodes: any[] = [];
     const edges: any[] = [];
 
-    // CENTER NODE
-
     nodes.push({
       id: selected.concept_name,
 
@@ -162,7 +161,6 @@ export default function Home() {
           item: RelatedConcept,
           idx: number
         ) => {
-
           if (!item?.concept_name) {
             return;
           }
@@ -212,7 +210,6 @@ export default function Home() {
           item: RelatedConcept,
           idx: number
         ) => {
-
           if (!item?.concept_name) {
             return;
           }
@@ -264,186 +261,155 @@ export default function Home() {
 
       {/* SIDEBAR */}
 
-      <div className="w-[360px] bg-white border-r overflow-y-auto p-4">
+      <div className="w-[380px] bg-white border-r overflow-y-auto p-4">
 
-        <h1 className="text-2xl font-bold mb-6">
+        <h1 className="text-2xl font-bold mb-4">
           Science Explorer
         </h1>
 
+        {/* SEARCH */}
+
+        <div className="mb-5">
+
+          <input
+            type="text"
+            placeholder="Search concepts..."
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-400"
+          />
+
+        </div>
+
         {Object.entries(tree).map(
-          ([subject, classes]: any) => (
+          ([subject, classes]: any) => {
 
-            <details
-              key={subject}
-              open={
-                expandedPath.subject ===
-                  subject ||
-                expandedPath.subject === ""
-              }
-              className="mb-4"
-            >
+            const hasMatchingConcept =
+              Object.values(classes).some(
+                (chapters: any) =>
+                  Object.values(chapters).some(
+                    (content: any) =>
+                      content.concepts.some(
+                        (concept: any) =>
+                          concept.concept_name
+                            ?.toLowerCase()
+                            .includes(
+                              search.toLowerCase()
+                            )
+                      )
+                  )
+              );
 
-              <summary className="cursor-pointer text-lg font-bold">
-                {subject}
-              </summary>
+            if (
+              search &&
+              !hasMatchingConcept
+            ) {
+              return null;
+            }
 
-              <div className="ml-4 mt-2">
+            return (
 
-                {Object.entries(classes).map(
-                  (
-                    [className, chapters]: any
-                  ) => (
+              <details
+                key={subject}
+                open
+                className="mb-4"
+              >
 
-                    <details
-                      key={className}
-                      open={
-                        expandedPath.className ===
-                        className
+                <summary className="cursor-pointer text-lg font-bold">
+                  {subject}
+                </summary>
+
+                <div className="ml-4 mt-2">
+
+                  {Object.entries(classes).map(
+                    (
+                      [className, chapters]: any
+                    ) => {
+
+                      const classHasMatch =
+                        Object.values(
+                          chapters
+                        ).some(
+                          (content: any) =>
+                            content.concepts.some(
+                              (
+                                concept: any
+                              ) =>
+                                concept.concept_name
+                                  ?.toLowerCase()
+                                  .includes(
+                                    search.toLowerCase()
+                                  )
+                            )
+                        );
+
+                      if (
+                        search &&
+                        !classHasMatch
+                      ) {
+                        return null;
                       }
-                      className="mb-3"
-                    >
 
-                      <summary className="cursor-pointer font-semibold">
-                        {className}
-                      </summary>
+                      return (
 
-                      <div className="ml-4 mt-2">
+                        <details
+                          key={className}
+                          open
+                          className="mb-3"
+                        >
 
-                        {Object.entries(chapters).map(
-                          (
-                            [chapter, content]: any
-                          ) => (
+                          <summary className="cursor-pointer font-semibold">
+                            {className}
+                          </summary>
 
-                            <details
-                              key={chapter}
-                              open={
-                                expandedPath.chapter ===
-                                chapter
-                              }
-                              className="mb-3"
-                            >
+                          <div className="ml-4 mt-2">
 
-                              <summary className="cursor-pointer text-blue-700">
-                                {chapter}
-                              </summary>
+                            {Object.entries(
+                              chapters
+                            ).map(
+                              (
+                                [
+                                  chapter,
+                                  content,
+                                ]: any
+                              ) => {
 
-                              <div className="ml-4 mt-2 space-y-3">
-
-                                {/* MAIN CONCEPTS */}
-
-                                {content.concepts
-                                  .filter(
+                                const chapterHasMatch =
+                                  content.concepts.some(
                                     (
                                       concept: any
                                     ) =>
-                                      !concept.parent_concept_name &&
-                                      concept.is_main_topic
-                                  )
-                                  .map(
-                                    (
-                                      concept: any
-                                    ) => {
+                                      concept.concept_name
+                                        ?.toLowerCase()
+                                        .includes(
+                                          search.toLowerCase()
+                                        )
+                                  );
 
-                                      const subtopics =
-                                        (
-                                          data as Concept[]
-                                        ).filter(
-                                          (
-                                            x
-                                          ) =>
-                                            x.parent_concept_name ===
-                                            concept.concept_name
-                                        );
+                                if (
+                                  search &&
+                                  !chapterHasMatch
+                                ) {
+                                  return null;
+                                }
 
-                                      return (
+                                return (
 
-                                        <div
-                                          key={
-                                            concept.concept_name
-                                          }
-                                        >
+                                  <details
+                                    key={chapter}
+                                    open
+                                    className="mb-3"
+                                  >
 
-                                          <button
-                                            onClick={() =>
-                                              selectConcept(
-                                                concept
-                                              )
-                                            }
-                                            className={`block text-left font-medium hover:text-blue-600 px-2 py-1 rounded-lg ${
-                                              selected?.concept_name ===
-                                              concept.concept_name
-                                                ? "bg-blue-100 text-blue-700"
-                                                : ""
-                                            }`}
-                                          >
-                                            {
-                                              concept.concept_name
-                                            }
-                                          </button>
-
-                                          {/* SUBTOPICS */}
-
-                                          {subtopics.length >
-                                            0 && (
-
-                                            <div className="ml-4 mt-1 space-y-1">
-
-                                              {subtopics.map(
-                                                (
-                                                  sub: any
-                                                ) => (
-
-                                                  <button
-                                                    key={
-                                                      sub.concept_name
-                                                    }
-                                                    onClick={() =>
-                                                      selectConcept(
-                                                        sub
-                                                      )
-                                                    }
-                                                    className={`block text-left text-sm px-2 py-1 rounded-lg hover:text-blue-500 ${
-                                                      selected?.concept_name ===
-                                                      sub.concept_name
-                                                        ? "bg-blue-100 text-blue-700"
-                                                        : "text-gray-700"
-                                                    }`}
-                                                  >
-                                                    •{" "}
-                                                    {
-                                                      sub.concept_name
-                                                    }
-                                                  </button>
-                                                )
-                                              )}
-
-                                            </div>
-
-                                          )}
-
-                                        </div>
-                                      );
-                                    }
-                                  )}
-
-                                {/* ADDITIONAL INFORMATION */}
-
-                                {content.concepts.filter(
-                                  (
-                                    concept: any
-                                  ) =>
-                                    !concept.parent_concept_name &&
-                                    !concept.is_main_topic
-                                ).length > 0 && (
-
-                                  <details className="mt-4">
-
-                                    <summary className="cursor-pointer text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                                      Additional
-                                      Information
+                                    <summary className="cursor-pointer text-blue-700">
+                                      {chapter}
                                     </summary>
 
-                                    <div className="ml-4 mt-2 space-y-1">
+                                    <div className="ml-4 mt-2 space-y-3">
+
+                                      {/* MAIN CONCEPTS */}
 
                                       {content.concepts
                                         .filter(
@@ -451,59 +417,206 @@ export default function Home() {
                                             concept: any
                                           ) =>
                                             !concept.parent_concept_name &&
-                                            !concept.is_main_topic
+                                            concept.is_main_topic
                                         )
                                         .map(
                                           (
                                             concept: any
-                                          ) => (
+                                          ) => {
 
-                                            <button
-                                              key={
-                                                concept.concept_name
-                                              }
-                                              onClick={() =>
-                                                selectConcept(
-                                                  concept
-                                                )
-                                              }
-                                              className={`block text-left text-sm px-2 py-1 rounded-lg hover:text-blue-500 ${
-                                                selected?.concept_name ===
-                                                concept.concept_name
-                                                  ? "bg-blue-100 text-blue-700"
-                                                  : "text-gray-700"
-                                              }`}
-                                            >
-                                              •{" "}
-                                              {
-                                                concept.concept_name
-                                              }
-                                            </button>
-                                          )
+                                            const matchesMain =
+                                              concept.concept_name
+                                                ?.toLowerCase()
+                                                .includes(
+                                                  search.toLowerCase()
+                                                );
+
+                                            const subtopics =
+                                              (
+                                                data as Concept[]
+                                              ).filter(
+                                                (
+                                                  x
+                                                ) =>
+                                                  x.parent_concept_name ===
+                                                  concept.concept_name
+                                              );
+
+                                            const filteredSubtopics =
+                                              subtopics.filter(
+                                                (
+                                                  sub: any
+                                                ) =>
+                                                  sub.concept_name
+                                                    ?.toLowerCase()
+                                                    .includes(
+                                                      search.toLowerCase()
+                                                    )
+                                              );
+
+                                            if (
+                                              search &&
+                                              !matchesMain &&
+                                              filteredSubtopics.length ===
+                                                0
+                                            ) {
+                                              return null;
+                                            }
+
+                                            return (
+
+                                              <div
+                                                key={
+                                                  concept.concept_name
+                                                }
+                                              >
+
+                                                {/* MAIN */}
+
+                                                <button
+                                                  onClick={() =>
+                                                    selectConcept(
+                                                      concept
+                                                    )
+                                                  }
+                                                  className={`block text-left font-medium hover:text-blue-600 px-2 py-1 rounded-lg ${
+                                                    selected?.concept_name ===
+                                                    concept.concept_name
+                                                      ? "bg-blue-100 text-blue-700"
+                                                      : ""
+                                                  }`}
+                                                >
+                                                  {
+                                                    concept.concept_name
+                                                  }
+                                                </button>
+
+                                                {/* SUBTOPICS */}
+
+                                                {filteredSubtopics.length >
+                                                  0 && (
+
+                                                  <div className="ml-4 mt-1 space-y-1">
+
+                                                    {filteredSubtopics.map(
+                                                      (
+                                                        sub: any
+                                                      ) => (
+
+                                                        <button
+                                                          key={
+                                                            sub.concept_name
+                                                          }
+                                                          onClick={() =>
+                                                            selectConcept(
+                                                              sub
+                                                            )
+                                                          }
+                                                          className={`block text-left text-sm px-2 py-1 rounded-lg hover:text-blue-500 ${
+                                                            selected?.concept_name ===
+                                                            sub.concept_name
+                                                              ? "bg-blue-100 text-blue-700"
+                                                              : "text-gray-700"
+                                                          }`}
+                                                        >
+                                                          •{" "}
+                                                          {
+                                                            sub.concept_name
+                                                          }
+                                                        </button>
+                                                      )
+                                                    )}
+
+                                                  </div>
+
+                                                )}
+
+                                              </div>
+                                            );
+                                          }
                                         )}
+
+                                      {/* ADDITIONAL INFORMATION */}
+
+                                      {content.concepts.filter(
+                                        (
+                                          concept: any
+                                        ) =>
+                                          !concept.parent_concept_name &&
+                                          !concept.is_main_topic
+                                      ).length > 0 && (
+
+                                        <details className="mt-4">
+
+                                          <summary className="cursor-pointer text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                            Additional
+                                            Information
+                                          </summary>
+
+                                          <div className="ml-4 mt-2 space-y-1">
+
+                                            {content.concepts
+                                              .filter(
+                                                (
+                                                  concept: any
+                                                ) =>
+                                                  !concept.parent_concept_name &&
+                                                  !concept.is_main_topic
+                                              )
+                                              .map(
+                                                (
+                                                  concept: any
+                                                ) => (
+
+                                                  <button
+                                                    key={
+                                                      concept.concept_name
+                                                    }
+                                                    onClick={() =>
+                                                      selectConcept(
+                                                        concept
+                                                      )
+                                                    }
+                                                    className={`block text-left text-sm px-2 py-1 rounded-lg hover:text-blue-500 ${
+                                                      selected?.concept_name ===
+                                                      concept.concept_name
+                                                        ? "bg-blue-100 text-blue-700"
+                                                        : "text-gray-700"
+                                                    }`}
+                                                  >
+                                                    •{" "}
+                                                    {
+                                                      concept.concept_name
+                                                    }
+                                                  </button>
+                                                )
+                                              )}
+
+                                          </div>
+
+                                        </details>
+
+                                      )}
 
                                     </div>
 
                                   </details>
+                                );
+                              }
+                            )}
 
-                                )}
+                          </div>
 
-                              </div>
+                        </details>
+                      );
+                    }
+                  )}
 
-                            </details>
-                          )
-                        )}
+                </div>
 
-                      </div>
-
-                    </details>
-                  )
-                )}
-
-              </div>
-
-            </details>
-          )
+              </details>
+            );
+          }
         )}
 
       </div>
@@ -521,8 +634,6 @@ export default function Home() {
         ) : (
 
           <div className="max-w-6xl mx-auto p-8">
-
-            {/* HEADER */}
 
             <div className="mb-8">
 
@@ -567,206 +678,6 @@ export default function Home() {
                 {selected.summary ||
                   "No summary available"}
               </p>
-
-            </div>
-
-            {/* KEY TERMS */}
-
-            {Array.isArray(
-              selected.key_terms
-            ) &&
-              selected.key_terms.length >
-                0 && (
-
-                <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-                  <h2 className="text-2xl font-semibold mb-4">
-                    Key Terms
-                  </h2>
-
-                  <div className="flex flex-wrap gap-3">
-
-                    {selected.key_terms.map(
-                      (
-                        term: string,
-                        idx: number
-                      ) => (
-
-                        <span
-                          key={idx}
-                          className="bg-gray-100 px-4 py-2 rounded-xl"
-                        >
-                          {term}
-                        </span>
-                      )
-                    )}
-
-                  </div>
-
-                </div>
-              )}
-
-            {/* BUILDS UPON */}
-
-            {Array.isArray(
-              selected.builds_upon
-            ) &&
-              selected.builds_upon.length >
-                0 && (
-
-                <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-                  <h2 className="text-2xl font-semibold mb-4">
-                    Builds Upon
-                  </h2>
-
-                  <div className="flex flex-wrap gap-3">
-
-                    {selected.builds_upon.map(
-                      (
-                        item: RelatedConcept,
-                        idx: number
-                      ) => {
-
-                        if (
-                          !item?.concept_name
-                        ) {
-                          return null;
-                        }
-
-                        const relatedConcept =
-                          conceptMap[
-                            item.concept_name
-                          ];
-
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              if (
-                                relatedConcept
-                              ) {
-                                selectConcept(
-                                  relatedConcept
-                                );
-                              }
-                            }}
-                            className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-4 py-2 rounded-xl transition"
-                          >
-                            {
-                              item.concept_name
-                            }
-                          </button>
-                        );
-                      }
-                    )}
-
-                  </div>
-
-                </div>
-              )}
-
-            {/* FREQUENTLY CONFUSED WITH */}
-
-            {Array.isArray(
-              selected.frequently_confused_with
-            ) &&
-              selected
-                .frequently_confused_with
-                .length > 0 && (
-
-                <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-                  <h2 className="text-2xl font-semibold mb-4">
-                    Frequently
-                    Confused With
-                  </h2>
-
-                  <div className="flex flex-wrap gap-3">
-
-                    {selected.frequently_confused_with.map(
-                      (
-                        item: RelatedConcept,
-                        idx: number
-                      ) => {
-
-                        if (
-                          !item?.concept_name
-                        ) {
-                          return null;
-                        }
-
-                        const relatedConcept =
-                          conceptMap[
-                            item.concept_name
-                          ];
-
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              if (
-                                relatedConcept
-                              ) {
-                                selectConcept(
-                                  relatedConcept
-                                );
-                              }
-                            }}
-                            className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-4 py-2 rounded-xl transition"
-                          >
-                            {
-                              item.concept_name
-                            }
-                          </button>
-                        );
-                      }
-                    )}
-
-                  </div>
-
-                </div>
-              )}
-
-            {/* GRAPH */}
-
-            <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-              <h2 className="text-2xl font-semibold mb-6">
-                Concept Graph
-              </h2>
-
-              <div className="h-[500px] rounded-2xl overflow-hidden border">
-
-                <ReactFlow
-                  nodes={graphData.nodes}
-                  edges={graphData.edges}
-                  fitView
-                  onNodeClick={(
-                    _,
-                    node
-                  ) => {
-
-                    const concept =
-                      conceptMap[
-                        node.data.label
-                      ];
-
-                    if (concept) {
-                      selectConcept(
-                        concept
-                      );
-                    }
-                  }}
-                >
-
-                  <MiniMap />
-                  <Controls />
-                  <Background />
-
-                </ReactFlow>
-
-              </div>
 
             </div>
 
