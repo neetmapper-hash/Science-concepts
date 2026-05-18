@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import data from "./data/concepts.json";
+
+import biologyData from "./data/biology_concepts.json";
+import physicsData from "./data/physics_concepts.json";
+import chemData from "./data/chem_concepts.json";
 
 import ReactFlow, {
   Background,
@@ -25,12 +28,16 @@ type Concept = {
   concept_id?: string;
 
   subject: string;
+
   class: number;
+
   chapter_name: string;
 
   concept_name: string;
 
   summary?: string;
+
+  detailed_summary?: string;
 
   difficulty_level?: string;
 
@@ -51,12 +58,14 @@ function buildTree(concepts: Concept[]) {
   const tree: any = {};
 
   concepts.forEach((item) => {
-    const subject = item.subject || "Unknown";
+    const subject =
+      item.subject || "Unknown";
 
     const className = `Class ${item.class}`;
 
     const chapter =
-      item.chapter_name || "Unknown Chapter";
+      item.chapter_name ||
+      "Unknown Chapter";
 
     if (!tree[subject]) {
       tree[subject] = {};
@@ -66,15 +75,18 @@ function buildTree(concepts: Concept[]) {
       tree[subject][className] = {};
     }
 
-    if (!tree[subject][className][chapter]) {
-      tree[subject][className][chapter] = {
-        concepts: [],
-      };
+    if (
+      !tree[subject][className][chapter]
+    ) {
+      tree[subject][className][chapter] =
+        {
+          concepts: [],
+        };
     }
 
-    tree[subject][className][chapter].concepts.push(
-      item
-    );
+    tree[subject][className][
+      chapter
+    ].concepts.push(item);
   });
 
   return tree;
@@ -94,6 +106,18 @@ export default function Home() {
       chapter: "",
     });
 
+  // MERGED DATASET
+
+  const allConcepts = useMemo(() => {
+    return [
+      ...(biologyData as Concept[]),
+
+      ...(physicsData as Concept[]),
+
+      ...(chemData as Concept[]),
+    ];
+  }, []);
+
   function selectConcept(concept: any) {
     setSelected(concept);
 
@@ -105,19 +129,19 @@ export default function Home() {
   }
 
   const tree = useMemo(
-    () => buildTree(data as Concept[]),
-    []
+    () => buildTree(allConcepts),
+    [allConcepts]
   );
 
   const conceptMap = useMemo(() => {
     const map: any = {};
 
-    (data as Concept[]).forEach((item) => {
+    allConcepts.forEach((item) => {
       map[item.concept_name] = item;
     });
 
     return map;
-  }, []);
+  }, [allConcepts]);
 
   const graphData = useMemo(() => {
     if (!selected) {
@@ -129,6 +153,8 @@ export default function Home() {
 
     const nodes: any[] = [];
     const edges: any[] = [];
+
+    // MAIN NODE
 
     nodes.push({
       id: selected.concept_name,
@@ -161,9 +187,8 @@ export default function Home() {
           item: RelatedConcept,
           idx: number
         ) => {
-          if (!item?.concept_name) {
+          if (!item?.concept_name)
             return;
-          }
 
           nodes.push({
             id: item.concept_name,
@@ -188,9 +213,11 @@ export default function Home() {
           edges.push({
             id: `build-${idx}`,
 
-            source: item.concept_name,
+            source:
+              item.concept_name,
 
-            target: selected.concept_name,
+            target:
+              selected.concept_name,
 
             animated: true,
           });
@@ -198,7 +225,7 @@ export default function Home() {
       );
     }
 
-    // FREQUENTLY CONFUSED WITH
+    // CONFUSED WITH
 
     if (
       Array.isArray(
@@ -210,12 +237,10 @@ export default function Home() {
           item: RelatedConcept,
           idx: number
         ) => {
-          if (!item?.concept_name) {
+          if (!item?.concept_name)
             return;
-          }
 
-          const nodeId =
-            `fc-${item.concept_name}`;
+          const nodeId = `fc-${item.concept_name}`;
 
           nodes.push({
             id: nodeId,
@@ -240,7 +265,8 @@ export default function Home() {
           edges.push({
             id: `confused-${idx}`,
 
-            source: selected.concept_name,
+            source:
+              selected.concept_name,
 
             target: nodeId,
 
@@ -289,10 +315,14 @@ export default function Home() {
             const hasMatchingConcept =
               Object.values(classes).some(
                 (chapters: any) =>
-                  Object.values(chapters).some(
+                  Object.values(
+                    chapters
+                  ).some(
                     (content: any) =>
                       content.concepts.some(
-                        (concept: any) =>
+                        (
+                          concept: any
+                        ) =>
                           concept.concept_name
                             ?.toLowerCase()
                             .includes(
@@ -317,7 +347,7 @@ export default function Home() {
                 className="mb-4"
               >
 
-                <summary className="cursor-pointer text-lg font-bold">
+                <summary className="cursor-pointer text-lg font-bold capitalize">
                   {subject}
                 </summary>
 
@@ -325,7 +355,10 @@ export default function Home() {
 
                   {Object.entries(classes).map(
                     (
-                      [className, chapters]: any
+                      [
+                        className,
+                        chapters,
+                      ]: any
                     ) => {
 
                       const classHasMatch =
@@ -409,7 +442,7 @@ export default function Home() {
 
                                     <div className="ml-4 mt-2 space-y-3">
 
-                                      {/* MAIN CONCEPTS */}
+                                      {/* MAIN TOPICS */}
 
                                       {content.concepts
                                         .filter(
@@ -432,9 +465,7 @@ export default function Home() {
                                                 );
 
                                             const subtopics =
-                                              (
-                                                data as Concept[]
-                                              ).filter(
+                                              allConcepts.filter(
                                                 (
                                                   x
                                                 ) =>
@@ -536,7 +567,7 @@ export default function Home() {
                                           }
                                         )}
 
-                                      {/* ADDITIONAL INFORMATION */}
+                                      {/* ADDITIONAL INFO */}
 
                                       {content.concepts.filter(
                                         (
@@ -635,12 +666,16 @@ export default function Home() {
 
           <div className="max-w-6xl mx-auto p-8">
 
+            {/* HEADER */}
+
             <div className="mb-8">
 
               <div className="flex items-center gap-4 mb-4">
 
                 <h1 className="text-5xl font-bold">
-                  {selected.concept_name}
+                  {
+                    selected.concept_name
+                  }
                 </h1>
 
                 {selected.difficulty_level && (
@@ -655,29 +690,110 @@ export default function Home() {
 
               </div>
 
-              <div className="text-gray-500">
-                {selected.subject} • Class{" "}
+              <div className="text-gray-500 capitalize">
+                {selected.subject} •
+                Class{" "}
                 {selected.class}
               </div>
 
               <div className="text-gray-500">
-                {selected.chapter_name}
+                {
+                  selected.chapter_name
+                }
               </div>
 
             </div>
 
-            {/* SUMMARY */}
+            {/* BRIEF EXPLANATION */}
 
             <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
 
               <h2 className="text-2xl font-semibold mb-4">
-                Summary
+                Brief Explanation
               </h2>
 
               <p className="text-lg leading-8 text-gray-700">
                 {selected.summary ||
-                  "No summary available"}
+                  "No explanation available"}
               </p>
+
+            </div>
+
+            {/* KEY TERMS */}
+
+            {Array.isArray(
+              selected.key_terms
+            ) &&
+              selected.key_terms.length >
+                0 && (
+
+                <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
+
+                  <h2 className="text-2xl font-semibold mb-4">
+                    Key Terms
+                  </h2>
+
+                  <div className="flex flex-wrap gap-3">
+
+                    {selected.key_terms.map(
+                      (
+                        term: string,
+                        idx: number
+                      ) => (
+
+                        <span
+                          key={idx}
+                          className="bg-gray-100 px-4 py-2 rounded-xl"
+                        >
+                          {term}
+                        </span>
+                      )
+                    )}
+
+                  </div>
+
+                </div>
+              )}
+
+            {/* GRAPH */}
+
+            <div className="bg-white rounded-3xl border shadow-sm p-8">
+
+              <h2 className="text-2xl font-semibold mb-6">
+                Concept Graph
+              </h2>
+
+              <div className="h-[500px] rounded-2xl overflow-hidden border">
+
+                <ReactFlow
+                  nodes={graphData.nodes}
+                  edges={graphData.edges}
+                  fitView
+                  onNodeClick={(
+                    _,
+                    node
+                  ) => {
+
+                    const concept =
+                      conceptMap[
+                        node.data.label
+                      ];
+
+                    if (concept) {
+                      selectConcept(
+                        concept
+                      );
+                    }
+                  }}
+                >
+
+                  <MiniMap />
+                  <Controls />
+                  <Background />
+
+                </ReactFlow>
+
+              </div>
 
             </div>
 
