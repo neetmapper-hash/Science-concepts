@@ -7,10 +7,95 @@ const client = new OpenAI({
     "https://api.groq.com/openai/v1",
 });
 
-export async function POST(req: Request) {
+function extractJSONArray(
+  text: string
+) {
+
+  const start =
+    text.indexOf("[");
+
+  const end =
+    text.lastIndexOf("]");
+
+  if (
+    start === -1 ||
+    end === -1
+  ) {
+    return null;
+  }
+
+  return text.slice(
+    start,
+    end + 1
+  );
+}
+
+function safeJSONParse(
+  raw: string
+) {
+
   try {
 
-    const body = await req.json();
+    return JSON.parse(raw);
+
+  } catch (err) {
+
+    // ATTEMPT FIXES
+
+    let fixed = raw;
+
+    // remove markdown
+
+    fixed = fixed
+      .replace(/```json/g, "")
+      .replace(/```/g, "");
+
+    // smart quotes
+
+    fixed = fixed
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'");
+
+    // trailing commas
+
+    fixed = fixed
+      .replace(/,\s*}/g, "}")
+      .replace(/,\s*]/g, "]");
+
+    // remove bad chars
+
+    fixed = fixed.replace(
+      /[\u0000-\u001F]+/g,
+      " "
+    );
+
+    // extract json array
+
+    const extracted =
+      extractJSONArray(
+        fixed
+      );
+
+    if (!extracted) {
+      throw new Error(
+        "Could not extract JSON array"
+      );
+    }
+
+    return JSON.parse(
+      extracted
+    );
+  }
+}
+
+export async function POST(
+  req: Request
+) {
+
+  try {
+
+    const body =
+      await req.json();
 
     const {
       chapter,
@@ -25,7 +110,8 @@ export async function POST(req: Request) {
         .map(
           (c: any) =>
             `
-Concept: ${c.concept_name}
+Concept:
+${c.concept_name}
 
 Summary:
 ${c.summary || ""}
@@ -33,46 +119,32 @@ ${c.summary || ""}
         )
         .join("\n");
 
-    // PROGRESSIVE DIFFICULTY PLAN
-
     const difficultyPlan = `
 Questions 1-5:
-- EASY
-- direct factual
-- concept recognition
+Easy
 
 Questions 6-10:
-- MEDIUM
-- understanding based
-- simple reasoning
+Medium
 
 Questions 11-15:
-- MEDIUM-HARD
-- application based
+Medium Hard
 
 Questions 16-20:
-- HARD
-- conceptual traps
-- multi-step thinking
+Hard
 
 Questions 21-25:
-- ADVANCED
-- analytical
-- edge cases
-- compare concepts
+Advanced
 
 Questions 26-30:
-- OLYMPIAD LEVEL
-- deep reasoning
-- complex application
-- difficult conceptual combinations
+Olympiad Level
 `;
 
     const prompt =
-      mode === "assertion_reasoning"
+      mode ===
+      "assertion_reasoning"
 
         ? `
-Generate EXACTLY 30 assertion and reasoning questions.
+Generate EXACTLY 30 assertion reasoning questions.
 
 Subject:
 ${subject}
@@ -86,140 +158,170 @@ ${chapter}
 Concepts:
 ${conceptText}
 
-Difficulty Progression:
+Difficulty progression:
 ${difficultyPlan}
 
-Requirements:
-- suitable for school students
-- scientifically accurate
-- avoid duplicates
-- increase difficulty every 5 questions
-- questions should progressively become harder
-
-Each question should contain:
-- assertion
-- reason
-- 4 options
-- answer
-- explanation
-
-Use EXACTLY these options:
-
-1. Both Assertion and Reason are true and Reason is the correct explanation of Assertion
-2. Both Assertion and Reason are true but Reason is NOT the correct explanation of Assertion
-3. Assertion is true but Reason is false
-4. Assertion is false but Reason is true
-
-Return ONLY valid JSON.
-
-Format:
-
-[
-  {
-    "question": "Choose the correct option.",
-
-    "difficulty": "easy",
-
-    "assertion": "...",
-
-    "reason": "...",
-
-    "options": [
-      "...",
-      "...",
-      "...",
-      "..."
-    ],
-
-    "answer": "...",
-
-    "explanation": "..."
-  }
-]
-`
-
-        : `
-Generate EXACTLY 30 multiple choice questions.
-
-Subject:
-${subject}
-
-Class:
-${classLevel}
-
-Chapter:
-${chapter}
-
-Concepts:
-${conceptText}
-
-Difficulty Progression:
-${difficultyPlan}
-
-Requirements:
-- 4 options per question
-- exactly 1 correct answer
-- include explanation
-- avoid duplicate questions
-- suitable for school students
-- progressively increase difficulty every 5 questions
-
-Return ONLY valid JSON.
+Rules:
+- valid JSON only
+- no markdown
+- no comments
+- no trailing commas
+- double quotes only
 
 Format:
 
 [
   {
     "question": "...",
-
     "difficulty": "easy",
-
+    "assertion": "...",
+    "reason": "...",
     "options": [
       "...",
       "...",
       "...",
       "..."
     ],
-
     "answer": "...",
+    "explanation": "..."
+  }
+]
+`
 
+        : `
+Generate EXACTLY 30 MCQs.
+
+Subject:
+${subject}
+
+Class:
+${classLevel}
+
+Chapter:
+${chapter}
+
+Concepts:
+${conceptText}
+
+Difficulty progression:
+${difficultyPlan}
+
+Rules:
+- valid JSON only
+- no markdown
+- no comments
+- no trailing commas
+- double quotes only
+
+Format:
+
+[
+  {
+    "question": "...",
+    "difficulty": "easy",
+    "options": [
+      "...",
+      "...",
+      "...",
+      "..."
+    ],
+    "answer": "...",
     "explanation": "..."
   }
 ]
 `;
-    const response =
-      await client.chat.completions.create({
-        model:
-          "llama-3.3-70b-versatile",
 
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+    let parsed = null;
 
-        temperature: 0.8,
+    let lastError: any =
+      null;
+
+    // RETRIES
+
+    for (
+      let attempt = 1;
+      attempt <= 3;
+      attempt++
+    ) {
+
+      try {
+
+        const response =
+          await client.chat.completions.create({
+            model:
+              "llama-3.3-70b-versatile",
+
+            messages: [
+              {
+                role: "user",
+                content:
+                  prompt,
+              },
+            ],
+
+            temperature: 0.7,
+          });
+
+        const text =
+          response.choices[0]
+            .message.content || "";
+
+        parsed =
+          safeJSONParse(
+            text
+          );
+
+        if (
+          Array.isArray(
+            parsed
+          )
+        ) {
+          break;
+        }
+
+      } catch (err) {
+
+        console.error(
+          `Attempt ${attempt} failed`
+        );
+
+        console.error(err);
+
+        lastError = err;
+      }
+    }
+
+    if (!parsed) {
+
+      return Response.json({
+        success: false,
+
+        error:
+          "Failed after retries",
+
+        details:
+          lastError?.message,
       });
+    }
 
-    const text =
-      response.choices[0]
-        .message.content || "";
-
-    // CLEAN MARKDOWN
-
-    const cleaned = text
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    const parsed =
-      JSON.parse(cleaned);
+    const validQuestions =
+      parsed.filter(
+        (q: any) =>
+          q.question &&
+          Array.isArray(
+            q.options
+          ) &&
+          q.answer
+      );
 
     return Response.json({
       success: true,
 
-      questions: parsed,
+      total:
+        validQuestions.length,
+
+      questions:
+        validQuestions,
     });
 
   } catch (error: any) {
@@ -229,7 +331,8 @@ Format:
     return Response.json({
       success: false,
 
-      error: error.message,
+      error:
+        error.message,
     });
   }
 }
