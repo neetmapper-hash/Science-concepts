@@ -108,14 +108,11 @@ export default function Home() {
   const [quizQuestions, setQuizQuestions] =
     useState<any[]>([]);
 
-  const [expandedPath, setExpandedPath] =
-    useState<any>({
-      subject: "",
-      className: "",
-      chapter: "",
-    });
+  const [selectedAnswers, setSelectedAnswers] =
+    useState<any>({});
 
-  // MERGED DATASET
+  const [assertionMode, setAssertionMode] =
+    useState(false);
 
   const allConcepts = useMemo(() => {
     return [
@@ -132,14 +129,10 @@ export default function Home() {
 
     setShowMockTest(false);
 
-    setExpandedPath({
-      subject: concept.subject,
-      className: `Class ${concept.class}`,
-      chapter: concept.chapter_name,
-    });
+    setSelectedAnswers({});
   }
 
-  // AI QUIZ GENERATOR
+  // NORMAL QUIZ
 
   async function generateQuiz() {
 
@@ -196,6 +189,86 @@ export default function Home() {
         );
 
         setShowMockTest(true);
+
+        setAssertionMode(false);
+
+        setSelectedAnswers({});
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+    } finally {
+
+      setLoadingQuiz(false);
+    }
+  }
+
+  // ASSERTION REASONING QUIZ
+
+  async function generateAssertionQuiz() {
+
+    if (!selected) return;
+
+    setLoadingQuiz(true);
+
+    try {
+
+      const chapterConcepts =
+        allConcepts.filter(
+          (x) =>
+            x.chapter_name ===
+              selected.chapter_name &&
+            x.class ===
+              selected.class &&
+            x.subject ===
+              selected.subject
+        );
+
+      const response = await fetch(
+        "/api/generate-quiz",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            subject:
+              selected.subject,
+
+            classLevel:
+              selected.class,
+
+            chapter:
+              selected.chapter_name,
+
+            concepts:
+              chapterConcepts,
+
+            mode:
+              "assertion_reasoning",
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (data.success) {
+
+        setQuizQuestions(
+          data.questions
+        );
+
+        setShowMockTest(true);
+
+        setAssertionMode(true);
+
+        setSelectedAnswers({});
       }
 
     } catch (error) {
@@ -234,8 +307,6 @@ export default function Home() {
     const nodes: any[] = [];
     const edges: any[] = [];
 
-    // MAIN NODE
-
     nodes.push({
       id: selected.concept_name,
 
@@ -256,8 +327,6 @@ export default function Home() {
         fontWeight: "bold",
       },
     });
-
-    // BUILDS UPON
 
     if (
       Array.isArray(selected.builds_upon)
@@ -305,8 +374,6 @@ export default function Home() {
       );
     }
 
-    // CONFUSED WITH
-
     if (
       Array.isArray(
         selected.frequently_confused_with
@@ -320,7 +387,8 @@ export default function Home() {
           if (!item?.concept_name)
             return;
 
-          const nodeId = `fc-${item.concept_name}`;
+          const nodeId =
+            `fc-${item.concept_name}`;
 
           nodes.push({
             id: nodeId,
@@ -391,33 +459,6 @@ export default function Home() {
 
         {Object.entries(tree).map(
           ([subject, classes]: any) => {
-
-            const hasMatchingConcept =
-              Object.values(classes).some(
-                (chapters: any) =>
-                  Object.values(
-                    chapters
-                  ).some(
-                    (content: any) =>
-                      content.concepts.some(
-                        (
-                          concept: any
-                        ) =>
-                          concept.concept_name
-                            ?.toLowerCase()
-                            .includes(
-                              search.toLowerCase()
-                            )
-                      )
-                  )
-              );
-
-            if (
-              search &&
-              !hasMatchingConcept
-            ) {
-              return null;
-            }
 
             return (
 
@@ -537,8 +578,6 @@ export default function Home() {
                                                 }
                                               >
 
-                                                {/* MAIN */}
-
                                                 <button
                                                   onClick={() =>
                                                     selectConcept(
@@ -556,8 +595,6 @@ export default function Home() {
                                                     concept.concept_name
                                                   }
                                                 </button>
-
-                                                {/* SUBTOPICS */}
 
                                                 {filteredSubtopics.length >
                                                   0 && (
@@ -675,9 +712,9 @@ export default function Home() {
                 }
               </div>
 
-              {/* MOCK TEST BUTTON */}
+              {/* BUTTONS */}
 
-              <div className="mt-5">
+              <div className="mt-5 flex gap-4">
 
                 <button
                   onClick={generateQuiz}
@@ -688,11 +725,21 @@ export default function Home() {
                     : "Mock Test"}
                 </button>
 
+                <button
+                  onClick={
+                    generateAssertionQuiz
+                  }
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-2xl"
+                >
+                  Assertion &
+                  Reasoning
+                </button>
+
               </div>
 
             </div>
 
-            {/* MOCK TEST */}
+            {/* QUIZ */}
 
             {showMockTest && (
 
@@ -703,7 +750,9 @@ export default function Home() {
                   <div>
 
                     <h2 className="text-3xl font-bold">
-                      Mock Test
+                      {assertionMode
+                        ? "Assertion & Reasoning Test"
+                        : "Mock Test"}
                     </h2>
 
                     <p className="text-gray-500 mt-2">
@@ -740,48 +789,176 @@ export default function Home() {
                           {q.question}
                         </h3>
 
+                        {q.assertion && (
+
+                          <div className="mb-5 space-y-3">
+
+                            <div className="bg-blue-50 p-4 rounded-2xl">
+
+                              <strong>
+                                Assertion:
+                              </strong>{" "}
+                              {
+                                q.assertion
+                              }
+
+                            </div>
+
+                            <div className="bg-purple-50 p-4 rounded-2xl">
+
+                              <strong>
+                                Reason:
+                              </strong>{" "}
+                              {q.reason}
+
+                            </div>
+
+                          </div>
+
+                        )}
+
                         <div className="space-y-3">
 
                           {q.options?.map(
                             (
                               option: string,
                               optionIdx: number
-                            ) => (
+                            ) => {
 
-                              <button
-                                key={optionIdx}
-                                className="block w-full text-left border rounded-2xl px-5 py-4 hover:bg-blue-50"
-                              >
-                                {option}
-                              </button>
+                              const selectedOption =
+                                selectedAnswers[
+                                  idx
+                                ];
 
-                            )
+                              const isCorrect =
+                                option ===
+                                q.answer;
+
+                              const isSelected =
+                                selectedOption ===
+                                option;
+
+                              let buttonClass =
+                                "block w-full text-left border rounded-2xl px-5 py-4 ";
+
+                              if (
+                                selectedOption
+                              ) {
+
+                                if (
+                                  isCorrect
+                                ) {
+
+                                  buttonClass +=
+                                    "bg-green-100 border-green-500";
+
+                                } else if (
+                                  isSelected
+                                ) {
+
+                                  buttonClass +=
+                                    "bg-red-100 border-red-500";
+
+                                } else {
+
+                                  buttonClass +=
+                                    "bg-gray-50";
+                                }
+
+                              } else {
+
+                                buttonClass +=
+                                  "hover:bg-blue-50";
+                              }
+
+                              return (
+
+                                <button
+                                  key={
+                                    optionIdx
+                                  }
+                                  disabled={
+                                    !!selectedOption
+                                  }
+                                  onClick={() =>
+                                    setSelectedAnswers(
+                                      (
+                                        prev: any
+                                      ) => ({
+                                        ...prev,
+                                        [idx]:
+                                          option,
+                                      })
+                                    )
+                                  }
+                                  className={
+                                    buttonClass
+                                  }
+                                >
+                                  {option}
+                                </button>
+
+                              );
+                            }
                           )}
 
                         </div>
 
-                        <div className="mt-5 text-sm text-gray-500">
+                        {selectedAnswers[
+                          idx
+                        ] && (
 
-                          <strong>
-                            Answer:
-                          </strong>{" "}
-                          {q.answer}
+                          <div className="mt-5 bg-gray-50 p-4 rounded-2xl">
 
-                        </div>
+                            <div className="text-green-700 font-semibold">
 
-                        <div className="mt-2 text-sm text-gray-600">
+                              Correct
+                              Answer:{" "}
+                              {q.answer}
 
-                          <strong>
-                            Explanation:
-                          </strong>{" "}
-                          {q.explanation}
+                            </div>
 
-                        </div>
+                            <div className="mt-2 text-gray-700">
+
+                              {
+                                q.explanation
+                              }
+
+                            </div>
+
+                          </div>
+
+                        )}
 
                       </div>
 
                     )
                   )}
+
+                </div>
+
+                {/* MORE QUESTIONS */}
+
+                <div className="mt-10 flex justify-center">
+
+                  <button
+                    onClick={() => {
+
+                      if (
+                        assertionMode
+                      ) {
+
+                        generateAssertionQuiz();
+
+                      } else {
+
+                        generateQuiz();
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl"
+                  >
+                    More Questions
+                  </button>
 
                 </div>
 

@@ -17,19 +17,87 @@ export async function POST(req: Request) {
       concepts,
       classLevel,
       subject,
+      mode,
     } = body;
 
     const conceptText =
       concepts
         .map(
           (c: any) =>
-            `Concept: ${c.concept_name}
-Summary: ${c.summary || ""}
+            `
+Concept: ${c.concept_name}
+
+Summary:
+${c.summary || ""}
 `
         )
         .join("\n");
 
-    const prompt = `
+    const prompt =
+      mode === "assertion_reasoning"
+
+        ? `
+Generate exactly 10 assertion and reasoning questions.
+
+Subject:
+${subject}
+
+Class:
+${classLevel}
+
+Chapter:
+${chapter}
+
+Concepts:
+${conceptText}
+
+Requirements:
+- suitable for school students
+- medium difficulty
+- avoid duplicates
+- scientifically accurate
+
+Each question should contain:
+- assertion
+- reason
+- 4 options
+- answer
+- explanation
+
+Use EXACTLY these options:
+
+1. Both Assertion and Reason are true and Reason is the correct explanation of Assertion
+2. Both Assertion and Reason are true but Reason is NOT the correct explanation of Assertion
+3. Assertion is true but Reason is false
+4. Assertion is false but Reason is true
+
+Return ONLY valid JSON.
+
+Format:
+
+[
+  {
+    "question": "Choose the correct option.",
+
+    "assertion": "...",
+
+    "reason": "...",
+
+    "options": [
+      "...",
+      "...",
+      "...",
+      "..."
+    ],
+
+    "answer": "...",
+
+    "explanation": "..."
+  }
+]
+`
+
+        : `
 Generate exactly 10 multiple choice questions.
 
 Subject:
@@ -59,13 +127,16 @@ Format:
 [
   {
     "question": "...",
+
     "options": [
       "...",
       "...",
       "...",
       "..."
     ],
+
     "answer": "...",
+
     "explanation": "..."
   }
 ]
@@ -90,7 +161,7 @@ Format:
       response.choices[0]
         .message.content || "";
 
-    // CLEAN JSON
+    // CLEAN MARKDOWN
 
     const cleaned = text
       .replace(/```json/g, "")
@@ -102,13 +173,17 @@ Format:
 
     return Response.json({
       success: true,
+
       questions: parsed,
     });
 
   } catch (error: any) {
 
+    console.error(error);
+
     return Response.json({
       success: false,
+
       error: error.message,
     });
   }
