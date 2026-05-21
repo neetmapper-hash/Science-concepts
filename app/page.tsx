@@ -99,6 +99,15 @@ export default function Home() {
   const [search, setSearch] =
     useState("");
 
+  const [showMockTest, setShowMockTest] =
+    useState(false);
+
+  const [loadingQuiz, setLoadingQuiz] =
+    useState(false);
+
+  const [quizQuestions, setQuizQuestions] =
+    useState<any[]>([]);
+
   const [expandedPath, setExpandedPath] =
     useState<any>({
       subject: "",
@@ -121,11 +130,82 @@ export default function Home() {
   function selectConcept(concept: any) {
     setSelected(concept);
 
+    setShowMockTest(false);
+
     setExpandedPath({
       subject: concept.subject,
       className: `Class ${concept.class}`,
       chapter: concept.chapter_name,
     });
+  }
+
+  // AI QUIZ GENERATOR
+
+  async function generateQuiz() {
+
+    if (!selected) return;
+
+    setLoadingQuiz(true);
+
+    try {
+
+      const chapterConcepts =
+        allConcepts.filter(
+          (x) =>
+            x.chapter_name ===
+              selected.chapter_name &&
+            x.class ===
+              selected.class &&
+            x.subject ===
+              selected.subject
+        );
+
+      const response = await fetch(
+        "/api/generate-quiz",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            subject:
+              selected.subject,
+
+            classLevel:
+              selected.class,
+
+            chapter:
+              selected.chapter_name,
+
+            concepts:
+              chapterConcepts,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (data.success) {
+
+        setQuizQuestions(
+          data.questions
+        );
+
+        setShowMockTest(true);
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+    } finally {
+
+      setLoadingQuiz(false);
+    }
   }
 
   const tree = useMemo(
@@ -361,30 +441,6 @@ export default function Home() {
                       ]: any
                     ) => {
 
-                      const classHasMatch =
-                        Object.values(
-                          chapters
-                        ).some(
-                          (content: any) =>
-                            content.concepts.some(
-                              (
-                                concept: any
-                              ) =>
-                                concept.concept_name
-                                  ?.toLowerCase()
-                                  .includes(
-                                    search.toLowerCase()
-                                  )
-                            )
-                        );
-
-                      if (
-                        search &&
-                        !classHasMatch
-                      ) {
-                        return null;
-                      }
-
                       return (
 
                         <details
@@ -409,25 +465,6 @@ export default function Home() {
                                 ]: any
                               ) => {
 
-                                const chapterHasMatch =
-                                  content.concepts.some(
-                                    (
-                                      concept: any
-                                    ) =>
-                                      concept.concept_name
-                                        ?.toLowerCase()
-                                        .includes(
-                                          search.toLowerCase()
-                                        )
-                                  );
-
-                                if (
-                                  search &&
-                                  !chapterHasMatch
-                                ) {
-                                  return null;
-                                }
-
                                 return (
 
                                   <details
@@ -441,8 +478,6 @@ export default function Home() {
                                     </summary>
 
                                     <div className="ml-4 mt-2 space-y-3">
-
-                                      {/* MAIN TOPICS */}
 
                                       {content.concepts
                                         .filter(
@@ -567,68 +602,6 @@ export default function Home() {
                                           }
                                         )}
 
-                                      {/* ADDITIONAL INFO */}
-
-                                      {content.concepts.filter(
-                                        (
-                                          concept: any
-                                        ) =>
-                                          !concept.parent_concept_name &&
-                                          !concept.is_main_topic
-                                      ).length > 0 && (
-
-                                        <details className="mt-4">
-
-                                          <summary className="cursor-pointer text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                                            Additional
-                                            Information
-                                          </summary>
-
-                                          <div className="ml-4 mt-2 space-y-1">
-
-                                            {content.concepts
-                                              .filter(
-                                                (
-                                                  concept: any
-                                                ) =>
-                                                  !concept.parent_concept_name &&
-                                                  !concept.is_main_topic
-                                              )
-                                              .map(
-                                                (
-                                                  concept: any
-                                                ) => (
-
-                                                  <button
-                                                    key={
-                                                      concept.concept_name
-                                                    }
-                                                    onClick={() =>
-                                                      selectConcept(
-                                                        concept
-                                                      )
-                                                    }
-                                                    className={`block text-left text-sm px-2 py-1 rounded-lg hover:text-blue-500 ${
-                                                      selected?.concept_name ===
-                                                      concept.concept_name
-                                                        ? "bg-blue-100 text-blue-700"
-                                                        : "text-gray-700"
-                                                    }`}
-                                                  >
-                                                    •{" "}
-                                                    {
-                                                      concept.concept_name
-                                                    }
-                                                  </button>
-                                                )
-                                              )}
-
-                                          </div>
-
-                                        </details>
-
-                                      )}
-
                                     </div>
 
                                   </details>
@@ -702,14 +675,127 @@ export default function Home() {
                 }
               </div>
 
+              {/* MOCK TEST BUTTON */}
+
+              <div className="mt-5">
+
+                <button
+                  onClick={generateQuiz}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl"
+                >
+                  {loadingQuiz
+                    ? "Generating..."
+                    : "Mock Test"}
+                </button>
+
+              </div>
+
             </div>
+
+            {/* MOCK TEST */}
+
+            {showMockTest && (
+
+              <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
+
+                <div className="flex items-center justify-between mb-8">
+
+                  <div>
+
+                    <h2 className="text-3xl font-bold">
+                      Mock Test
+                    </h2>
+
+                    <p className="text-gray-500 mt-2">
+                      {
+                        selected.chapter_name
+                      }
+                    </p>
+
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setShowMockTest(false)
+                    }
+                    className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-xl"
+                  >
+                    Close
+                  </button>
+
+                </div>
+
+                <div className="space-y-10">
+
+                  {quizQuestions.map(
+                    (q, idx) => (
+
+                      <div
+                        key={idx}
+                        className="border-b pb-8"
+                      >
+
+                        <h3 className="font-semibold text-xl mb-5">
+                          Q{idx + 1}.{" "}
+                          {q.question}
+                        </h3>
+
+                        <div className="space-y-3">
+
+                          {q.options?.map(
+                            (
+                              option: string,
+                              optionIdx: number
+                            ) => (
+
+                              <button
+                                key={optionIdx}
+                                className="block w-full text-left border rounded-2xl px-5 py-4 hover:bg-blue-50"
+                              >
+                                {option}
+                              </button>
+
+                            )
+                          )}
+
+                        </div>
+
+                        <div className="mt-5 text-sm text-gray-500">
+
+                          <strong>
+                            Answer:
+                          </strong>{" "}
+                          {q.answer}
+
+                        </div>
+
+                        <div className="mt-2 text-sm text-gray-600">
+
+                          <strong>
+                            Explanation:
+                          </strong>{" "}
+                          {q.explanation}
+
+                        </div>
+
+                      </div>
+
+                    )
+                  )}
+
+                </div>
+
+              </div>
+
+            )}
 
             {/* BRIEF EXPLANATION */}
 
             <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
 
               <h2 className="text-2xl font-semibold mb-4">
-                Brief Explanation
+                Brief
+                Explanation
               </h2>
 
               <p className="text-lg leading-8 text-gray-700">
@@ -718,42 +804,6 @@ export default function Home() {
               </p>
 
             </div>
-
-            {/* KEY TERMS */}
-
-            {Array.isArray(
-              selected.key_terms
-            ) &&
-              selected.key_terms.length >
-                0 && (
-
-                <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-                  <h2 className="text-2xl font-semibold mb-4">
-                    Key Terms
-                  </h2>
-
-                  <div className="flex flex-wrap gap-3">
-
-                    {selected.key_terms.map(
-                      (
-                        term: string,
-                        idx: number
-                      ) => (
-
-                        <span
-                          key={idx}
-                          className="bg-gray-100 px-4 py-2 rounded-xl"
-                        >
-                          {term}
-                        </span>
-                      )
-                    )}
-
-                  </div>
-
-                </div>
-              )}
 
             {/* GRAPH */}
 
