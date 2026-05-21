@@ -1,3 +1,6 @@
+# Updated `app/page.tsx`
+
+```tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -17,40 +20,19 @@ import "reactflow/dist/style.css";
 type RelatedConcept = {
   concept_id?: string;
   concept_name: string;
-  class?: number;
-  chapter_name?: string;
-  chapter_number?: number;
-  is_main_topic?: boolean;
 };
 
 type Concept = {
-  id?: string;
-  concept_id?: string;
-
   subject: string;
-
   class: number;
-
   chapter_name: string;
-
   concept_name: string;
-
   summary?: string;
-
-  detailed_summary?: string;
-
   difficulty_level?: string;
-
   key_terms?: string[];
-
-  aliases?: string[];
-
   is_main_topic?: boolean;
-
   parent_concept_name?: string;
-
   builds_upon?: any;
-
   frequently_confused_with?: any;
 };
 
@@ -58,35 +40,22 @@ function buildTree(concepts: Concept[]) {
   const tree: any = {};
 
   concepts.forEach((item) => {
-    const subject =
-      item.subject || "Unknown";
-
+    const subject = item.subject || "Unknown";
     const className = `Class ${item.class}`;
+    const chapter = item.chapter_name || "Unknown Chapter";
 
-    const chapter =
-      item.chapter_name ||
-      "Unknown Chapter";
-
-    if (!tree[subject]) {
-      tree[subject] = {};
-    }
-
+    if (!tree[subject]) tree[subject] = {};
     if (!tree[subject][className]) {
       tree[subject][className] = {};
     }
 
-    if (
-      !tree[subject][className][chapter]
-    ) {
-      tree[subject][className][chapter] =
-        {
-          concepts: [],
-        };
+    if (!tree[subject][className][chapter]) {
+      tree[subject][className][chapter] = {
+        concepts: [],
+      };
     }
 
-    tree[subject][className][
-      chapter
-    ].concepts.push(item);
+    tree[subject][className][chapter].concepts.push(item);
   });
 
   return tree;
@@ -117,31 +86,23 @@ export default function Home() {
   const allConcepts = useMemo(() => {
     return [
       ...(biologyData as Concept[]),
-
       ...(physicsData as Concept[]),
-
       ...(chemData as Concept[]),
     ];
   }, []);
 
   function selectConcept(concept: any) {
     setSelected(concept);
-
     setShowMockTest(false);
-
     setSelectedAnswers({});
   }
 
-  // NORMAL QUIZ
-
   async function generateQuiz() {
-
     if (!selected) return;
 
     setLoadingQuiz(true);
 
     try {
-
       const chapterConcepts =
         allConcepts.filter(
           (x) =>
@@ -183,7 +144,6 @@ export default function Home() {
         await response.json();
 
       if (data.success) {
-
         setQuizQuestions(
           data.questions
         );
@@ -194,27 +154,19 @@ export default function Home() {
 
         setSelectedAnswers({});
       }
-
     } catch (error) {
-
       console.error(error);
-
     } finally {
-
       setLoadingQuiz(false);
     }
   }
 
-  // ASSERTION REASONING QUIZ
-
   async function generateAssertionQuiz() {
-
     if (!selected) return;
 
     setLoadingQuiz(true);
 
     try {
-
       const chapterConcepts =
         allConcepts.filter(
           (x) =>
@@ -259,7 +211,6 @@ export default function Home() {
         await response.json();
 
       if (data.success) {
-
         setQuizQuestions(
           data.questions
         );
@@ -270,13 +221,9 @@ export default function Home() {
 
         setSelectedAnswers({});
       }
-
     } catch (error) {
-
       console.error(error);
-
     } finally {
-
       setLoadingQuiz(false);
     }
   }
@@ -374,56 +321,6 @@ export default function Home() {
       );
     }
 
-    if (
-      Array.isArray(
-        selected.frequently_confused_with
-      )
-    ) {
-      selected.frequently_confused_with.forEach(
-        (
-          item: RelatedConcept,
-          idx: number
-        ) => {
-          if (!item?.concept_name)
-            return;
-
-          const nodeId =
-            `fc-${item.concept_name}`;
-
-          nodes.push({
-            id: nodeId,
-
-            position: {
-              x: 700,
-              y: idx * 120,
-            },
-
-            data: {
-              label: item.concept_name,
-            },
-
-            style: {
-              background: "#ea580c",
-              color: "white",
-              borderRadius: 12,
-              padding: 10,
-            },
-          });
-
-          edges.push({
-            id: `confused-${idx}`,
-
-            source:
-              selected.concept_name,
-
-            target: nodeId,
-
-            animated: true,
-          });
-        }
-      );
-    }
-
     return {
       nodes,
       edges,
@@ -433,15 +330,11 @@ export default function Home() {
   return (
     <main className="h-screen flex bg-gray-100">
 
-      {/* SIDEBAR */}
-
       <div className="w-[380px] bg-white border-r overflow-y-auto p-4">
 
         <h1 className="text-2xl font-bold mb-4">
           Science Explorer
         </h1>
-
-        {/* SEARCH */}
 
         <div className="mb-5">
 
@@ -458,225 +351,112 @@ export default function Home() {
         </div>
 
         {Object.entries(tree).map(
-          ([subject, classes]: any) => {
+          ([subject, classes]: any) => (
+            <details
+              key={subject}
+              open
+              className="mb-4"
+            >
+              <summary className="cursor-pointer text-lg font-bold capitalize">
+                {subject}
+              </summary>
 
-            return (
+              <div className="ml-4 mt-2">
 
-              <details
-                key={subject}
-                open
-                className="mb-4"
-              >
+                {Object.entries(classes).map(
+                  ([className, chapters]: any) => (
+                    <details
+                      key={className}
+                      open
+                      className="mb-3"
+                    >
+                      <summary className="cursor-pointer font-semibold">
+                        {className}
+                      </summary>
 
-                <summary className="cursor-pointer text-lg font-bold capitalize">
-                  {subject}
-                </summary>
+                      <div className="ml-4 mt-2">
 
-                <div className="ml-4 mt-2">
+                        {Object.entries(
+                          chapters
+                        ).map(
+                          ([chapter, content]: any) => (
+                            <details
+                              key={chapter}
+                              open
+                              className="mb-3"
+                            >
+                              <summary className="cursor-pointer text-blue-700">
+                                {chapter}
+                              </summary>
 
-                  {Object.entries(classes).map(
-                    (
-                      [
-                        className,
-                        chapters,
-                      ]: any
-                    ) => {
+                              <div className="ml-4 mt-2 space-y-3">
 
-                      return (
-
-                        <details
-                          key={className}
-                          open
-                          className="mb-3"
-                        >
-
-                          <summary className="cursor-pointer font-semibold">
-                            {className}
-                          </summary>
-
-                          <div className="ml-4 mt-2">
-
-                            {Object.entries(
-                              chapters
-                            ).map(
-                              (
-                                [
-                                  chapter,
-                                  content,
-                                ]: any
-                              ) => {
-
-                                return (
-
-                                  <details
-                                    key={chapter}
-                                    open
-                                    className="mb-3"
-                                  >
-
-                                    <summary className="cursor-pointer text-blue-700">
-                                      {chapter}
-                                    </summary>
-
-                                    <div className="ml-4 mt-2 space-y-3">
-
-                                      {content.concepts
-                                        .filter(
-                                          (
-                                            concept: any
-                                          ) =>
-                                            !concept.parent_concept_name &&
-                                            concept.is_main_topic
-                                        )
-                                        .map(
-                                          (
-                                            concept: any
-                                          ) => {
-
-                                            const matchesMain =
-                                              concept.concept_name
-                                                ?.toLowerCase()
-                                                .includes(
-                                                  search.toLowerCase()
-                                                );
-
-                                            const subtopics =
-                                              allConcepts.filter(
-                                                (
-                                                  x
-                                                ) =>
-                                                  x.parent_concept_name ===
-                                                  concept.concept_name
-                                              );
-
-                                            const filteredSubtopics =
-                                              subtopics.filter(
-                                                (
-                                                  sub: any
-                                                ) =>
-                                                  sub.concept_name
-                                                    ?.toLowerCase()
-                                                    .includes(
-                                                      search.toLowerCase()
-                                                    )
-                                              );
-
-                                            if (
-                                              search &&
-                                              !matchesMain &&
-                                              filteredSubtopics.length ===
-                                                0
-                                            ) {
-                                              return null;
-                                            }
-
-                                            return (
-
-                                              <div
-                                                key={
-                                                  concept.concept_name
-                                                }
-                                              >
-
-                                                <button
-                                                  onClick={() =>
-                                                    selectConcept(
-                                                      concept
-                                                    )
-                                                  }
-                                                  className={`block text-left font-medium hover:text-blue-600 px-2 py-1 rounded-lg ${
-                                                    selected?.concept_name ===
-                                                    concept.concept_name
-                                                      ? "bg-blue-100 text-blue-700"
-                                                      : ""
-                                                  }`}
-                                                >
-                                                  {
-                                                    concept.concept_name
-                                                  }
-                                                </button>
-
-                                                {filteredSubtopics.length >
-                                                  0 && (
-
-                                                  <div className="ml-4 mt-1 space-y-1">
-
-                                                    {filteredSubtopics.map(
-                                                      (
-                                                        sub: any
-                                                      ) => (
-
-                                                        <button
-                                                          key={
-                                                            sub.concept_name
-                                                          }
-                                                          onClick={() =>
-                                                            selectConcept(
-                                                              sub
-                                                            )
-                                                          }
-                                                          className={`block text-left text-sm px-2 py-1 rounded-lg hover:text-blue-500 ${
-                                                            selected?.concept_name ===
-                                                            sub.concept_name
-                                                              ? "bg-blue-100 text-blue-700"
-                                                              : "text-gray-700"
-                                                          }`}
-                                                        >
-                                                          •{" "}
-                                                          {
-                                                            sub.concept_name
-                                                          }
-                                                        </button>
-                                                      )
-                                                    )}
-
-                                                  </div>
-
-                                                )}
-
-                                              </div>
-                                            );
+                                {content.concepts
+                                  .filter(
+                                    (
+                                      concept: any
+                                    ) =>
+                                      !concept.parent_concept_name &&
+                                      concept.is_main_topic
+                                  )
+                                  .map(
+                                    (
+                                      concept: any
+                                    ) => (
+                                      <div
+                                        key={
+                                          concept.concept_name
+                                        }
+                                      >
+                                        <button
+                                          onClick={() =>
+                                            selectConcept(
+                                              concept
+                                            )
                                           }
-                                        )}
+                                          className={`block text-left font-medium hover:text-blue-600 px-2 py-1 rounded-lg ${
+                                            selected?.concept_name ===
+                                            concept.concept_name
+                                              ? "bg-blue-100 text-blue-700"
+                                              : ""
+                                          }`}
+                                        >
+                                          {
+                                            concept.concept_name
+                                          }
+                                        </button>
+                                      </div>
+                                    )
+                                  )}
 
-                                    </div>
+                              </div>
 
-                                  </details>
-                                );
-                              }
-                            )}
+                            </details>
+                          )
+                        )}
 
-                          </div>
+                      </div>
 
-                        </details>
-                      );
-                    }
-                  )}
+                    </details>
+                  )
+                )}
 
-                </div>
+              </div>
 
-              </details>
-            );
-          }
+            </details>
+          )
         )}
 
       </div>
 
-      {/* RIGHT PANEL */}
-
       <div className="flex-1 overflow-y-auto bg-gray-50">
 
         {!selected ? (
-
           <div className="h-full flex items-center justify-center text-2xl text-gray-400">
             Select a concept
           </div>
-
         ) : (
-
           <div className="max-w-6xl mx-auto p-8">
-
-            {/* HEADER */}
 
             <div className="mb-8">
 
@@ -688,22 +468,11 @@ export default function Home() {
                   }
                 </h1>
 
-                {selected.difficulty_level && (
-
-                  <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm">
-                    {
-                      selected.difficulty_level
-                    }
-                  </span>
-
-                )}
-
               </div>
 
               <div className="text-gray-500 capitalize">
                 {selected.subject} •
-                Class{" "}
-                {selected.class}
+                Class {selected.class}
               </div>
 
               <div className="text-gray-500">
@@ -711,8 +480,6 @@ export default function Home() {
                   selected.chapter_name
                 }
               </div>
-
-              {/* BUTTONS */}
 
               <div className="mt-5 flex gap-4">
 
@@ -739,8 +506,6 @@ export default function Home() {
 
             </div>
 
-            {/* QUIZ */}
-
             {showMockTest && (
 
               <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
@@ -754,12 +519,6 @@ export default function Home() {
                         ? "Assertion & Reasoning Test"
                         : "Mock Test"}
                     </h2>
-
-                    <p className="text-gray-500 mt-2">
-                      {
-                        selected.chapter_name
-                      }
-                    </p>
 
                   </div>
 
@@ -778,39 +537,41 @@ export default function Home() {
 
                   {quizQuestions.map(
                     (q, idx) => (
-
                       <div
                         key={idx}
                         className="border-b pb-8"
                       >
 
-                        <h3 className="font-semibold text-xl mb-5">
-                          Q{idx + 1}.{" "}
-                          {q.question}
-                        </h3>
+                        <div className="flex items-center gap-3 mb-5">
+
+                          <h3 className="font-semibold text-xl">
+                            Q{idx + 1}. {q.question}
+                          </h3>
+
+                          <span className="text-xs px-3 py-1 rounded-full bg-gray-100">
+                            {q.difficulty}
+                          </span>
+
+                        </div>
 
                         {q.assertion && (
 
                           <div className="mb-5 space-y-3">
 
                             <div className="bg-blue-50 p-4 rounded-2xl">
-
                               <strong>
                                 Assertion:
                               </strong>{" "}
                               {
                                 q.assertion
                               }
-
                             </div>
 
                             <div className="bg-purple-50 p-4 rounded-2xl">
-
                               <strong>
                                 Reason:
                               </strong>{" "}
                               {q.reason}
-
                             </div>
 
                           </div>
@@ -848,31 +609,23 @@ export default function Home() {
                                 if (
                                   isCorrect
                                 ) {
-
                                   buttonClass +=
                                     "bg-green-100 border-green-500";
-
                                 } else if (
                                   isSelected
                                 ) {
-
                                   buttonClass +=
                                     "bg-red-100 border-red-500";
-
                                 } else {
-
                                   buttonClass +=
                                     "bg-gray-50";
                                 }
-
                               } else {
-
                                 buttonClass +=
                                   "hover:bg-blue-50";
                               }
 
                               return (
-
                                 <button
                                   key={
                                     optionIdx
@@ -897,61 +650,27 @@ export default function Home() {
                                 >
                                   {option}
                                 </button>
-
                               );
                             }
                           )}
 
                         </div>
 
-                        {selectedAnswers[
-                          idx
-                        ] && (
-
-                          <div className="mt-5 bg-gray-50 p-4 rounded-2xl">
-
-                            <div className="text-green-700 font-semibold">
-
-                              Correct
-                              Answer:{" "}
-                              {q.answer}
-
-                            </div>
-
-                            <div className="mt-2 text-gray-700">
-
-                              {
-                                q.explanation
-                              }
-
-                            </div>
-
-                          </div>
-
-                        )}
-
                       </div>
-
                     )
                   )}
 
                 </div>
 
-                {/* MORE QUESTIONS */}
-
                 <div className="mt-10 flex justify-center">
 
                   <button
                     onClick={() => {
-
                       if (
                         assertionMode
                       ) {
-
                         generateAssertionQuiz();
-
                       } else {
-
                         generateQuiz();
                       }
                     }}
@@ -966,13 +685,10 @@ export default function Home() {
 
             )}
 
-            {/* BRIEF EXPLANATION */}
-
             <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
 
               <h2 className="text-2xl font-semibold mb-4">
-                Brief
-                Explanation
+                Brief Explanation
               </h2>
 
               <p className="text-lg leading-8 text-gray-700">
@@ -981,8 +697,6 @@ export default function Home() {
               </p>
 
             </div>
-
-            {/* GRAPH */}
 
             <div className="bg-white rounded-3xl border shadow-sm p-8">
 
@@ -1000,7 +714,6 @@ export default function Home() {
                     _,
                     node
                   ) => {
-
                     const concept =
                       conceptMap[
                         node.data.label
@@ -1025,7 +738,6 @@ export default function Home() {
             </div>
 
           </div>
-
         )}
 
       </div>
@@ -1033,3 +745,4 @@ export default function Home() {
     </main>
   );
 }
+```

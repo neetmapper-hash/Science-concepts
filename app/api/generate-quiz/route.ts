@@ -33,11 +33,46 @@ ${c.summary || ""}
         )
         .join("\n");
 
+    // PROGRESSIVE DIFFICULTY PLAN
+
+    const difficultyPlan = `
+Questions 1-5:
+- EASY
+- direct factual
+- concept recognition
+
+Questions 6-10:
+- MEDIUM
+- understanding based
+- simple reasoning
+
+Questions 11-15:
+- MEDIUM-HARD
+- application based
+
+Questions 16-20:
+- HARD
+- conceptual traps
+- multi-step thinking
+
+Questions 21-25:
+- ADVANCED
+- analytical
+- edge cases
+- compare concepts
+
+Questions 26-30:
+- OLYMPIAD LEVEL
+- deep reasoning
+- complex application
+- difficult conceptual combinations
+`;
+
     const prompt =
       mode === "assertion_reasoning"
 
         ? `
-Generate exactly 10 assertion and reasoning questions.
+Generate EXACTLY 30 assertion and reasoning questions.
 
 Subject:
 ${subject}
@@ -51,11 +86,15 @@ ${chapter}
 Concepts:
 ${conceptText}
 
+Difficulty Progression:
+${difficultyPlan}
+
 Requirements:
 - suitable for school students
-- medium difficulty
-- avoid duplicates
 - scientifically accurate
+- avoid duplicates
+- increase difficulty every 5 questions
+- questions should progressively become harder
 
 Each question should contain:
 - assertion
@@ -79,6 +118,8 @@ Format:
   {
     "question": "Choose the correct option.",
 
+    "difficulty": "easy",
+
     "assertion": "...",
 
     "reason": "...",
@@ -98,7 +139,7 @@ Format:
 `
 
         : `
-Generate exactly 10 multiple choice questions.
+Generate EXACTLY 30 multiple choice questions.
 
 Subject:
 ${subject}
@@ -112,13 +153,16 @@ ${chapter}
 Concepts:
 ${conceptText}
 
+Difficulty Progression:
+${difficultyPlan}
+
 Requirements:
 - 4 options per question
 - exactly 1 correct answer
 - include explanation
-- medium difficulty
 - avoid duplicate questions
 - suitable for school students
+- progressively increase difficulty every 5 questions
 
 Return ONLY valid JSON.
 
@@ -127,6 +171,8 @@ Format:
 [
   {
     "question": "...",
+
+    "difficulty": "easy",
 
     "options": [
       "...",
@@ -141,7 +187,6 @@ Format:
   }
 ]
 `;
-
     const response =
       await client.chat.completions.create({
         model:
@@ -154,7 +199,7 @@ Format:
           },
         ],
 
-        temperature: 0.7,
+        temperature: 0.8,
       });
 
     const text =
