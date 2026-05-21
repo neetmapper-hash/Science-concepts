@@ -1,844 +1,382 @@
-"use client";
+import OpenAI from "openai";
 
-import { useMemo, useState } from "react";
+const client = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
 
-import biologyData from "./data/biology_concepts.json";
-import physicsData from "./data/physics_concepts.json";
-import chemData from "./data/chem_concepts.json";
+  baseURL:
+    "https://api.groq.com/openai/v1",
+});
 
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-} from "reactflow";
+export async function POST(req: Request) {
 
-import "reactflow/dist/style.css";
+  try {
 
-type RelatedConcept = {
-  concept_id?: string;
-  concept_name: string;
-};
+    const body = await req.json();
 
-type Concept = {
-  subject: string;
-  class: number;
-  chapter_name: string;
-  concept_name: string;
-  summary?: string;
-  difficulty_level?: string;
-  key_terms?: string[];
-  is_main_topic?: boolean;
-  parent_concept_name?: string;
-  builds_upon?: any;
-  frequently_confused_with?: any;
-};
+    const {
+      chapter,
+      concepts,
+      classLevel,
+      subject,
+      mode,
+    } = body;
 
-function buildTree(concepts: Concept[]) {
-  const tree: any = {};
+    const conceptText =
+      concepts
+        .map(
+          (c: any) =>
+            `
+Concept: ${c.concept_name}
 
-  concepts.forEach((item) => {
-    const subject =
-      item.subject || "Unknown";
+Summary:
+${c.summary || ""}
+`
+        )
+        .join("\n");
 
-    const className =
-      `Class ${item.class}`;
+    // DIFFICULTY PROGRESSION
 
-    const chapter =
-      item.chapter_name ||
-      "Unknown Chapter";
+    const difficultyPlan = `
+Questions 1-5:
+- EASY
+- direct factual
+- concept recognition
 
-    if (!tree[subject]) {
-      tree[subject] = {};
-    }
+Questions 6-10:
+- MEDIUM
+- understanding based
+- simple reasoning
 
-    if (!tree[subject][className]) {
-      tree[subject][className] = {};
-    }
+Questions 11-15:
+- MEDIUM-HARD
+- application based
 
-    if (
-      !tree[subject][className][chapter]
-    ) {
-      tree[subject][className][chapter] =
-        {
-          concepts: [],
-        };
-    }
+Questions 16-20:
+- HARD
+- conceptual traps
+- multi-step thinking
 
-    tree[subject][className][
-      chapter
-    ].concepts.push(item);
-  });
+Questions 21-25:
+- ADVANCED
+- analytical
+- compare concepts
+- edge cases
 
-  return tree;
-}
+Questions 26-30:
+- OLYMPIAD LEVEL
+- deep reasoning
+- difficult conceptual combinations
+- complex applications
+`;
 
-export default function Home() {
+    // ASSERTION / REASONING PROMPT
 
-  const [selected, setSelected] =
-    useState<any>(null);
+    const assertionPrompt = `
+Generate EXACTLY 30 assertion and reasoning questions.
 
-  const [search, setSearch] =
-    useState("");
+Subject:
+${subject}
 
-  const [showMockTest, setShowMockTest] =
-    useState(false);
+Class:
+${classLevel}
 
-  const [loadingQuiz, setLoadingQuiz] =
-    useState(false);
+Chapter:
+${chapter}
 
-  const [quizQuestions, setQuizQuestions] =
-    useState<any[]>([]);
+Concepts:
+${conceptText}
 
-  const [selectedAnswers, setSelectedAnswers] =
-    useState<any>({});
+Difficulty Progression:
+${difficultyPlan}
 
-  const [assertionMode, setAssertionMode] =
-    useState(false);
+Requirements:
+- scientifically accurate
+- suitable for school students
+- avoid duplicates
+- progressively increase difficulty every 5 questions
+- questions should become harder gradually
 
-  const allConcepts = useMemo(() => {
+Each question MUST contain:
+- question
+- difficulty
+- assertion
+- reason
+- options
+- answer
+- explanation
 
-    return [
-      ...(biologyData as Concept[]),
+Use EXACTLY these options:
 
-      ...(physicsData as Concept[]),
+1. Both Assertion and Reason are true and Reason is the correct explanation of Assertion
+2. Both Assertion and Reason are true but Reason is NOT the correct explanation of Assertion
+3. Assertion is true but Reason is false
+4. Assertion is false but Reason is true
 
-      ...(chemData as Concept[]),
-    ];
+Return ONLY STRICT VALID JSON.
 
-  }, []);
+Rules:
+- double quotes only
+- no markdown
+- no trailing commas
+- no comments
+- no extra explanation
+- output must be directly parsable using JSON.parse()
 
-  function selectConcept(concept: any) {
+Format:
 
-    setSelected(concept);
+[
+  {
+    "question": "Choose the correct option.",
 
-    setShowMockTest(false);
+    "difficulty": "easy",
 
-    setSelectedAnswers({});
+    "assertion": "...",
+
+    "reason": "...",
+
+    "options": [
+      "...",
+      "...",
+      "...",
+      "..."
+    ],
+
+    "answer": "...",
+
+    "explanation": "..."
   }
+]
+`;
 
-  // NORMAL QUIZ
+    // NORMAL QUIZ PROMPT
 
-  async function generateQuiz() {
+    const normalPrompt = `
+Generate EXACTLY 30 multiple choice questions.
 
-    if (!selected) return;
+Subject:
+${subject}
 
-    setLoadingQuiz(true);
+Class:
+${classLevel}
 
-    try {
+Chapter:
+${chapter}
 
-      const chapterConcepts =
-        allConcepts.filter(
-          (x) =>
-            x.chapter_name ===
-              selected.chapter_name &&
-            x.class ===
-              selected.class &&
-            x.subject ===
-              selected.subject
-        );
+Concepts:
+${conceptText}
 
-      const response = await fetch(
-        "/api/generate-quiz",
-        {
-          method: "POST",
+Difficulty Progression:
+${difficultyPlan}
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+Requirements:
+- 4 options per question
+- exactly 1 correct answer
+- include explanation
+- avoid duplicate questions
+- suitable for school students
+- progressively increase difficulty every 5 questions
 
-          body: JSON.stringify({
-            subject:
-              selected.subject,
+Return ONLY STRICT VALID JSON.
 
-            classLevel:
-              selected.class,
+Rules:
+- double quotes only
+- no markdown
+- no trailing commas
+- no comments
+- no extra explanation
+- output must be directly parsable using JSON.parse()
 
-            chapter:
-              selected.chapter_name,
+Format:
 
-            concepts:
-              chapterConcepts,
-          }),
-        }
-      );
+[
+  {
+    "question": "...",
 
-      const data =
-        await response.json();
+    "difficulty": "easy",
 
-      if (data.success) {
+    "options": [
+      "...",
+      "...",
+      "...",
+      "..."
+    ],
 
-        setQuizQuestions(
-          data.questions
-        );
+    "answer": "...",
 
-        setShowMockTest(true);
-
-        setAssertionMode(false);
-
-        setSelectedAnswers({});
-      }
-
-    } catch (error) {
-
-      console.error(error);
-
-    } finally {
-
-      setLoadingQuiz(false);
-    }
+    "explanation": "..."
   }
+]
+`;
 
-  // ASSERTION QUIZ
+    const prompt =
+      mode === "assertion_reasoning"
+        ? assertionPrompt
+        : normalPrompt;
 
-  async function generateAssertionQuiz() {
+    // RETRY LOGIC
 
-    if (!selected) return;
+    let parsed: any = null;
 
-    setLoadingQuiz(true);
+    let lastError: any = null;
 
-    try {
+    for (let attempt = 1; attempt <= 3; attempt++) {
 
-      const chapterConcepts =
-        allConcepts.filter(
-          (x) =>
-            x.chapter_name ===
-              selected.chapter_name &&
-            x.class ===
-              selected.class &&
-            x.subject ===
-              selected.subject
+      try {
+
+        console.log(
+          `Quiz generation attempt ${attempt}`
         );
 
-      const response = await fetch(
-        "/api/generate-quiz",
-        {
-          method: "POST",
+        const response =
+          await client.chat.completions.create({
+            model:
+              "llama-3.3-70b-versatile",
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
 
-          body: JSON.stringify({
-            subject:
-              selected.subject,
-
-            classLevel:
-              selected.class,
-
-            chapter:
-              selected.chapter_name,
-
-            concepts:
-              chapterConcepts,
-
-            mode:
-              "assertion_reasoning",
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (data.success) {
-
-        setQuizQuestions(
-          data.questions
-        );
-
-        setShowMockTest(true);
-
-        setAssertionMode(true);
-
-        setSelectedAnswers({});
-      }
-
-    } catch (error) {
-
-      console.error(error);
-
-    } finally {
-
-      setLoadingQuiz(false);
-    }
-  }
-
-  const tree = useMemo(
-    () => buildTree(allConcepts),
-    [allConcepts]
-  );
-
-  const conceptMap = useMemo(() => {
-
-    const map: any = {};
-
-    allConcepts.forEach((item) => {
-
-      map[item.concept_name] = item;
-    });
-
-    return map;
-
-  }, [allConcepts]);
-
-  const graphData = useMemo(() => {
-
-    if (!selected) {
-
-      return {
-        nodes: [],
-        edges: [],
-      };
-    }
-
-    const nodes: any[] = [];
-    const edges: any[] = [];
-
-    nodes.push({
-      id: selected.concept_name,
-
-      position: {
-        x: 400,
-        y: 200,
-      },
-
-      data: {
-        label: selected.concept_name,
-      },
-
-      style: {
-        background: "#2563eb",
-        color: "white",
-        borderRadius: 12,
-        padding: 10,
-        fontWeight: "bold",
-      },
-    });
-
-    if (
-      Array.isArray(selected.builds_upon)
-    ) {
-
-      selected.builds_upon.forEach(
-        (
-          item: RelatedConcept,
-          idx: number
-        ) => {
-
-          if (!item?.concept_name)
-            return;
-
-          nodes.push({
-            id: item.concept_name,
-
-            position: {
-              x: 100,
-              y: idx * 120,
-            },
-
-            data: {
-              label: item.concept_name,
-            },
-
-            style: {
-              background: "#9333ea",
-              color: "white",
-              borderRadius: 12,
-              padding: 10,
-            },
+            temperature: 0.7,
           });
 
-          edges.push({
-            id: `build-${idx}`,
+        const text =
+          response.choices[0]
+            .message.content || "";
 
-            source:
-              item.concept_name,
+        // CLEAN RESPONSE
 
-            target:
-              selected.concept_name,
+        const cleaned = text
 
-            animated: true,
-          });
+          .replace(/```json/g, "")
+
+          .replace(/```/g, "")
+
+          .replace(/[“”]/g, '"')
+
+          .replace(/[‘’]/g, "'")
+
+          .trim();
+
+        try {
+
+          parsed = JSON.parse(cleaned);
+
+          break;
+
+        } catch (err) {
+
+          console.error(
+            "Initial parse failed"
+          );
+
+          // RECOVERY FIXES
+
+          const fixed = cleaned
+
+            // remove trailing commas
+            .replace(/,\s*}/g, "}")
+
+            .replace(/,\s*]/g, "]")
+
+            // remove control chars
+            .replace(
+              /[\u0000-\u001F]+/g,
+              " "
+            )
+
+            // normalize spaces
+            .replace(/\s+/g, " ")
+
+            .trim();
+
+          try {
+
+            parsed = JSON.parse(fixed);
+
+            break;
+
+          } catch (err2) {
+
+            console.error(
+              "Recovery parse failed"
+            );
+
+            lastError = err2;
+          }
         }
-      );
+
+      } catch (apiError) {
+
+        console.error(apiError);
+
+        lastError = apiError;
+      }
     }
 
-    return {
-      nodes,
-      edges,
-    };
-
-  }, [selected]);
-
-  return (
-    <main className="h-screen flex bg-gray-100">
-
-      {/* SIDEBAR */}
-
-      <div className="w-[380px] bg-white border-r overflow-y-auto p-4">
-
-        <h1 className="text-2xl font-bold mb-4">
-          Science Explorer
-        </h1>
-
-        {/* SEARCH */}
-
-        <div className="mb-5">
-
-          <input
-            type="text"
-            placeholder="Search concepts..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-400"
-          />
-
-        </div>
-
-        {Object.entries(tree).map(
-          ([subject, classes]: any) => (
-
-            <details
-              key={subject}
-              open
-              className="mb-4"
-            >
-
-              <summary className="cursor-pointer text-lg font-bold capitalize">
-                {subject}
-              </summary>
-
-              <div className="ml-4 mt-2">
-
-                {Object.entries(classes).map(
-                  ([className, chapters]: any) => (
-
-                    <details
-                      key={className}
-                      open
-                      className="mb-3"
-                    >
-
-                      <summary className="cursor-pointer font-semibold">
-                        {className}
-                      </summary>
+    // FAILED AFTER RETRIES
 
-                      <div className="ml-4 mt-2">
+    if (!parsed) {
 
-                        {Object.entries(
-                          chapters
-                        ).map(
-                          ([chapter, content]: any) => (
+      return Response.json({
+        success: false,
 
-                            <details
-                              key={chapter}
-                              open
-                              className="mb-3"
-                            >
+        error:
+          "AI response parsing failed after retries",
 
-                              <summary className="cursor-pointer text-blue-700">
-                                {chapter}
-                              </summary>
+        details:
+          lastError?.message ||
+          "Unknown error",
+      });
+    }
 
-                              <div className="ml-4 mt-2 space-y-3">
+    // VALIDATE QUESTIONS
 
-                                {content.concepts
-                                  .filter(
-                                    (
-                                      concept: any
-                                    ) =>
-                                      !concept.parent_concept_name &&
-                                      concept.is_main_topic
-                                  )
-                                  .map(
-                                    (
-                                      concept: any
-                                    ) => (
-
-                                      <div
-                                        key={
-                                          concept.concept_name
-                                        }
-                                      >
-
-                                        <button
-                                          onClick={() =>
-                                            selectConcept(
-                                              concept
-                                            )
-                                          }
-                                          className={`block text-left font-medium hover:text-blue-600 px-2 py-1 rounded-lg ${
-                                            selected?.concept_name ===
-                                            concept.concept_name
-                                              ? "bg-blue-100 text-blue-700"
-                                              : ""
-                                          }`}
-                                        >
-                                          {
-                                            concept.concept_name
-                                          }
-                                        </button>
+    if (
+      !Array.isArray(parsed)
+    ) {
 
-                                      </div>
-                                    )
-                                  )}
+      return Response.json({
+        success: false,
 
-                              </div>
+        error:
+          "AI did not return an array",
+      });
+    }
 
-                            </details>
-                          )
-                        )}
+    // FILTER BAD QUESTIONS
 
-                      </div>
+    const validQuestions =
+      parsed.filter(
+        (q: any) =>
+          q.question &&
+          Array.isArray(q.options) &&
+          q.options.length >= 4 &&
+          q.answer
+      );
 
-                    </details>
-                  )
-                )}
+    return Response.json({
+      success: true,
 
-              </div>
+      total:
+        validQuestions.length,
 
-            </details>
-          )
-        )}
+      questions:
+        validQuestions,
+    });
 
-      </div>
+  } catch (error: any) {
 
-      {/* RIGHT PANEL */}
+    console.error(error);
 
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+    return Response.json({
+      success: false,
 
-        {!selected ? (
-
-          <div className="h-full flex items-center justify-center text-2xl text-gray-400">
-            Select a concept
-          </div>
-
-        ) : (
-
-          <div className="max-w-6xl mx-auto p-8">
-
-            {/* HEADER */}
-
-            <div className="mb-8">
-
-              <div className="flex items-center gap-4 mb-4">
-
-                <h1 className="text-5xl font-bold">
-                  {
-                    selected.concept_name
-                  }
-                </h1>
-
-              </div>
-
-              <div className="text-gray-500 capitalize">
-                {selected.subject} •
-                Class {selected.class}
-              </div>
-
-              <div className="text-gray-500">
-                {
-                  selected.chapter_name
-                }
-              </div>
-
-              {/* BUTTONS */}
-
-              <div className="mt-5 flex gap-4">
-
-                <button
-                  onClick={generateQuiz}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl"
-                >
-                  {loadingQuiz
-                    ? "Generating..."
-                    : "Mock Test"}
-                </button>
-
-                <button
-                  onClick={
-                    generateAssertionQuiz
-                  }
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-2xl"
-                >
-                  Assertion &
-                  Reasoning
-                </button>
-
-              </div>
-
-            </div>
-
-            {/* QUIZ */}
-
-            {showMockTest && (
-
-              <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-                <div className="flex items-center justify-between mb-8">
-
-                  <div>
-
-                    <h2 className="text-3xl font-bold">
-                      {assertionMode
-                        ? "Assertion & Reasoning Test"
-                        : "Mock Test"}
-                    </h2>
-
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      setShowMockTest(false)
-                    }
-                    className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-xl"
-                  >
-                    Close
-                  </button>
-
-                </div>
-
-                <div className="space-y-10">
-
-                  {quizQuestions.map(
-                    (q, idx) => (
-
-                      <div
-                        key={idx}
-                        className="border-b pb-8"
-                      >
-
-                        <div className="flex items-center gap-3 mb-5">
-
-                          <h3 className="font-semibold text-xl">
-                            Q{idx + 1}.{" "}
-                            {q.question}
-                          </h3>
-
-                          <span className="text-xs px-3 py-1 rounded-full bg-gray-100">
-
-                            {q.difficulty}
-
-                          </span>
-
-                        </div>
-
-                        {q.assertion && (
-
-                          <div className="mb-5 space-y-3">
-
-                            <div className="bg-blue-50 p-4 rounded-2xl">
-
-                              <strong>
-                                Assertion:
-                              </strong>{" "}
-                              {
-                                q.assertion
-                              }
-
-                            </div>
-
-                            <div className="bg-purple-50 p-4 rounded-2xl">
-
-                              <strong>
-                                Reason:
-                              </strong>{" "}
-                              {q.reason}
-
-                            </div>
-
-                          </div>
-
-                        )}
-
-                        <div className="space-y-3">
-
-                          {q.options?.map(
-                            (
-                              option: string,
-                              optionIdx: number
-                            ) => {
-
-                              const selectedOption =
-                                selectedAnswers[
-                                  idx
-                                ];
-
-                              const isCorrect =
-                                option ===
-                                q.answer;
-
-                              const isSelected =
-                                selectedOption ===
-                                option;
-
-                              let buttonClass =
-                                "block w-full text-left border rounded-2xl px-5 py-4 ";
-
-                              if (
-                                selectedOption
-                              ) {
-
-                                if (
-                                  isCorrect
-                                ) {
-
-                                  buttonClass +=
-                                    "bg-green-100 border-green-500";
-
-                                } else if (
-                                  isSelected
-                                ) {
-
-                                  buttonClass +=
-                                    "bg-red-100 border-red-500";
-
-                                } else {
-
-                                  buttonClass +=
-                                    "bg-gray-50";
-                                }
-
-                              } else {
-
-                                buttonClass +=
-                                  "hover:bg-blue-50";
-                              }
-
-                              return (
-
-                                <button
-                                  key={
-                                    optionIdx
-                                  }
-                                  disabled={
-                                    !!selectedOption
-                                  }
-                                  onClick={() =>
-                                    setSelectedAnswers(
-                                      (
-                                        prev: any
-                                      ) => ({
-                                        ...prev,
-                                        [idx]:
-                                          option,
-                                      })
-                                    )
-                                  }
-                                  className={
-                                    buttonClass
-                                  }
-                                >
-                                  {option}
-                                </button>
-                              );
-                            }
-                          )}
-
-                        </div>
-
-                      </div>
-                    )
-                  )}
-
-                </div>
-
-                {/* MORE QUESTIONS */}
-
-                <div className="mt-10 flex justify-center">
-
-                  <button
-                    onClick={() => {
-
-                      if (
-                        assertionMode
-                      ) {
-
-                        generateAssertionQuiz();
-
-                      } else {
-
-                        generateQuiz();
-                      }
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl"
-                  >
-                    More Questions
-                  </button>
-
-                </div>
-
-              </div>
-
-            )}
-
-            {/* BRIEF EXPLANATION */}
-
-            <div className="bg-white rounded-3xl border shadow-sm p-8 mb-8">
-
-              <h2 className="text-2xl font-semibold mb-4">
-                Brief Explanation
-              </h2>
-
-              <p className="text-lg leading-8 text-gray-700">
-                {selected.summary ||
-                  "No explanation available"}
-              </p>
-
-            </div>
-
-            {/* GRAPH */}
-
-            <div className="bg-white rounded-3xl border shadow-sm p-8">
-
-              <h2 className="text-2xl font-semibold mb-6">
-                Concept Graph
-              </h2>
-
-              <div className="h-[500px] rounded-2xl overflow-hidden border">
-
-                <ReactFlow
-                  nodes={graphData.nodes}
-                  edges={graphData.edges}
-                  fitView
-                  onNodeClick={(
-                    _,
-                    node
-                  ) => {
-
-                    const concept =
-                      conceptMap[
-                        node.data.label
-                      ];
-
-                    if (concept) {
-                      selectConcept(
-                        concept
-                      );
-                    }
-                  }}
-                >
-
-                  <MiniMap />
-                  <Controls />
-                  <Background />
-
-                </ReactFlow>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        )}
-
-      </div>
-
-    </main>
-  );
+      error:
+        error.message ||
+        "Unknown server error",
+    });
+  }
 }
