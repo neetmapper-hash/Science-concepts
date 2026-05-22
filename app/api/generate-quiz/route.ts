@@ -21,6 +21,7 @@ function extractJSONArray(
     start === -1 ||
     end === -1
   ) {
+
     return null;
   }
 
@@ -42,32 +43,30 @@ function safeJSONParse(
 
     let fixed = raw;
 
-    // remove markdown
+    // REMOVE MARKDOWN
 
     fixed = fixed
       .replace(/```json/g, "")
       .replace(/```/g, "");
 
-    // smart quotes
+    // SMART QUOTES
 
     fixed = fixed
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'");
 
-    // trailing commas
+    // TRAILING COMMAS
 
     fixed = fixed
       .replace(/,\s*}/g, "}")
       .replace(/,\s*]/g, "]");
 
-    // remove invalid control chars
+    // INVALID CONTROL CHARS
 
     fixed = fixed.replace(
       /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,
       ""
     );
-
-    // extract json array
 
     const extracted =
       extractJSONArray(
@@ -104,8 +103,14 @@ export async function POST(
       mode,
     } = body;
 
+    // LIMIT CONCEPTS
+    // MASSIVE PERFORMANCE BOOST
+
+    const limitedConcepts =
+      concepts.slice(0, 8);
+
     const conceptText =
-      concepts
+      limitedConcepts
         .map(
           (c: any) =>
             `
@@ -113,25 +118,27 @@ Concept:
 ${c.concept_name}
 
 Summary:
-${c.summary || ""}
+${(
+  c.summary || ""
+).slice(0, 300)}
 `
         )
         .join("\n");
 
     const difficultyPlan = `
-Questions 1:
+Question 1:
 Easy
 
-Questions 2:
+Question 2:
 Easy
 
-Questions 3:
+Question 3:
 Medium
 
-Questions 4:
+Question 4:
 Hard
 
-Questions 5:
+Question 5:
 Advanced
 `;
 
@@ -237,7 +244,7 @@ Format:
 
     const allQuestions: any[] = [];
 
-    // 6 batches × 5 questions = 30
+    // 6 batches × 5 questions
 
     for (
       let batch = 0;
@@ -247,9 +254,6 @@ Format:
 
       let parsed = null;
 
-      let lastError: any =
-        null;
-
       for (
         let attempt = 1;
         attempt <= 3;
@@ -258,11 +262,20 @@ Format:
 
         try {
 
+          console.log(
+            `Generating batch ${
+              batch + 1
+            } attempt ${attempt}`
+          );
+
           const response =
             await Promise.race([
               client.chat.completions.create({
                 model:
-                  "llama-3.3-70b-versatile",
+                  mode ===
+                  "assertion_reasoning"
+                    ? "llama-3.3-70b-versatile"
+                    : "llama-3.1-8b-instant",
 
                 messages: [
                   {
@@ -272,9 +285,9 @@ Format:
                   },
                 ],
 
-                temperature: 0.5,
+                temperature: 0.4,
 
-                max_tokens: 4000,
+                max_tokens: 1800,
               }),
 
               new Promise(
@@ -286,7 +299,7 @@ Format:
                           "Groq timeout"
                         )
                       ),
-                    30000
+                    60000
                   )
               ),
             ]);
@@ -309,6 +322,12 @@ Format:
             )
           ) {
 
+            console.log(
+              `Batch ${
+                batch + 1
+              } success`
+            );
+
             break;
           }
 
@@ -321,8 +340,6 @@ Format:
           );
 
           console.error(err);
-
-          lastError = err;
         }
       }
 
