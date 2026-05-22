@@ -40,8 +40,6 @@ function safeJSONParse(
 
   } catch (err) {
 
-    // ATTEMPT FIXES
-
     let fixed = raw;
 
     // remove markdown
@@ -62,11 +60,11 @@ function safeJSONParse(
       .replace(/,\s*}/g, "}")
       .replace(/,\s*]/g, "]");
 
-    // remove bad chars
+    // remove invalid control chars
 
     fixed = fixed.replace(
-      /[\u0000-\u001F]+/g,
-      " "
+      /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,
+      ""
     );
 
     // extract json array
@@ -77,6 +75,7 @@ function safeJSONParse(
       );
 
     if (!extracted) {
+
       throw new Error(
         "Could not extract JSON array"
       );
@@ -120,23 +119,20 @@ ${c.summary || ""}
         .join("\n");
 
     const difficultyPlan = `
-Questions 1-5:
+Questions 1:
 Easy
 
-Questions 6-10:
+Questions 2:
+Easy
+
+Questions 3:
 Medium
 
-Questions 11-15:
-Medium Hard
-
-Questions 16-20:
+Questions 4:
 Hard
 
-Questions 21-25:
+Questions 5:
 Advanced
-
-Questions 26-30:
-Olympiad Level
 `;
 
     const prompt =
@@ -144,7 +140,7 @@ Olympiad Level
       "assertion_reasoning"
 
         ? `
-Generate EXACTLY 30 assertion reasoning questions.
+Generate EXACTLY 5 assertion reasoning questions.
 
 Subject:
 ${subject}
@@ -163,10 +159,14 @@ ${difficultyPlan}
 
 Rules:
 - valid JSON only
+- output ONLY JSON array
 - no markdown
 - no comments
 - no trailing commas
 - double quotes only
+- escape quotes properly
+- every object must be valid JSON
+- never truncate output
 
 Format:
 
@@ -189,7 +189,7 @@ Format:
 `
 
         : `
-Generate EXACTLY 30 MCQs.
+Generate EXACTLY 5 MCQs.
 
 Subject:
 ${subject}
@@ -208,10 +208,14 @@ ${difficultyPlan}
 
 Rules:
 - valid JSON only
+- output ONLY JSON array
 - no markdown
 - no comments
 - no trailing commas
 - double quotes only
+- escape quotes properly
+- every object must be valid JSON
+- never truncate output
 
 Format:
 
@@ -231,97 +235,167 @@ Format:
 ]
 `;
 
-    let parsed = null;
+    const allQuestions: any[] = [];
 
-    let lastError: any =
-      null;
-
-    // RETRIES
+    // 6 batches × 5 questions = 30
 
     for (
-      let attempt = 1;
-      attempt <= 3;
-      attempt++
+      let batch = 0;
+      batch < 6;
+      batch++
     ) {
 
-      try {
+      let parsed = null;
 
-        const response =
-          await client.chat.completions.create({
-            model:
-              "llama-3.3-70b-versatile",
+      let lastError: any =
+        null;
 
-            messages: [
-              {
-                role: "user",
-                content:
-                  prompt,
-              },
-            ],
+      for (
+        let attempt = 1;
+        attempt <= 3;
+        attempt++
+      ) {
 
-            temperature: 0.7,
-          });
+        try {
 
-        const text =
-          response.choices[0]
-            .message.content || "";
+          const response =
+            await Promise.race([
+              client.chat.completions.create({
+                model:
+                  "llama-3.3-70b-versatile",
 
-        parsed =
-          safeJSONParse(
-            text
+                messages: [
+                  {
+                    role: "user",
+                    content:
+                      prompt,
+                  },
+                ],
+
+                temperature: 0.5,
+
+                max_tokens: 4000,
+              }),
+
+              new Promise(
+                (_, reject) =>
+                  setTimeout(
+                    () =>
+                      reject(
+                        new Error(
+                          "Groq timeout"
+                        )
+                      ),
+                    30000
+                  )
+              ),
+            ]);
+
+          const text =
+            (
+              response as any
+            ).choices?.[0]
+              ?.message
+              ?.content || "";
+
+          parsed =
+            safeJSONParse(
+              text
+            );
+
+          if (
+            Array.isArray(
+              parsed
+            )
+          ) {
+
+            break;
+          }
+
+        } catch (err) {
+
+          console.error(
+            `Batch ${
+              batch + 1
+            } Attempt ${attempt} failed`
           );
 
-        if (
-          Array.isArray(
-            parsed
-          )
-        ) {
-          break;
-        }
+          console.error(err);
 
-      } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!parsed) {
 
         console.error(
-          `Attempt ${attempt} failed`
+          `Batch ${
+            batch + 1
+          } failed completely`
         );
 
-        console.error(err);
-
-        lastError = err;
+        continue;
       }
+
+      allQuestions.push(
+        ...parsed
+      );
     }
 
-    if (!parsed) {
-
-      return Response.json({
-        success: false,
-
-        error:
-          "Failed after retries",
-
-        details:
-          lastError?.message,
-      });
-    }
+    // VALIDATE QUESTIONS
 
     const validQuestions =
-      parsed.filter(
+      allQuestions.filter(
         (q: any) =>
           q.question &&
           Array.isArray(
             q.options
           ) &&
-          q.answer
+          q.options.length ===
+            4 &&
+          q.answer &&
+          q.explanation
       );
+
+    // REMOVE DUPLICATES
+
+    const uniqueQuestions =
+      validQuestions.filter(
+        (
+          question,
+          index,
+          self
+        ) =>
+          index ===
+          self.findIndex(
+            (q: any) =>
+              q.question ===
+              question.question
+          )
+      );
+
+    // MINIMUM SAFETY
+
+    if (
+      uniqueQuestions.length < 5
+    ) {
+
+      return Response.json({
+        success: false,
+
+        error:
+          "Too few valid questions generated",
+      });
+    }
 
     return Response.json({
       success: true,
 
       total:
-        validQuestions.length,
+        uniqueQuestions.length,
 
       questions:
-        validQuestions,
+        uniqueQuestions,
     });
 
   } catch (error: any) {

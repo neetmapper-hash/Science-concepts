@@ -34,6 +34,7 @@ type Concept = {
 };
 
 function buildTree(concepts: Concept[]) {
+
   const tree: any = {};
 
   concepts.forEach((item) => {
@@ -59,14 +60,14 @@ function buildTree(concepts: Concept[]) {
     if (
       !tree[subject][className][chapter]
     ) {
+
       tree[subject][className][chapter] = {
         concepts: [],
       };
     }
 
-    tree[subject][className][
-      chapter
-    ].concepts.push(item);
+    tree[subject][className][chapter]
+      .concepts.push(item);
   });
 
   return tree;
@@ -261,9 +262,33 @@ export default function Home() {
     }
   }
 
+  const filteredConcepts =
+    useMemo(() => {
+
+      if (!search.trim()) {
+        return allConcepts;
+      }
+
+      return allConcepts.filter(
+        (concept) =>
+          concept.concept_name
+            .toLowerCase()
+            .includes(
+              search.toLowerCase()
+            ) ||
+          concept.chapter_name
+            .toLowerCase()
+            .includes(
+              search.toLowerCase()
+            )
+      );
+
+    }, [search, allConcepts]);
+
   const tree = useMemo(
-    () => buildTree(allConcepts),
-    [allConcepts]
+    () =>
+      buildTree(filteredConcepts),
+    [filteredConcepts]
   );
 
   const conceptMap = useMemo(() => {
@@ -570,6 +595,54 @@ export default function Home() {
 
             </div>
 
+            {/* PREREQUISITES */}
+
+            {selected.builds_upon?.length >
+              0 && (
+
+              <div className="bg-yellow-50 border rounded-3xl p-6 mb-8">
+
+                <h2 className="text-2xl font-semibold mb-4">
+                  Prerequisites
+                </h2>
+
+                <div className="flex flex-wrap gap-3">
+
+                  {selected.builds_upon.map(
+                    (
+                      item: any,
+                      idx: number
+                    ) => (
+
+                      <button
+                        key={idx}
+                        onClick={() => {
+
+                          const concept =
+                            conceptMap[
+                              item.concept_name
+                            ];
+
+                          if (concept) {
+                            selectConcept(
+                              concept
+                            );
+                          }
+                        }}
+                        className="bg-white border px-4 py-2 rounded-xl hover:bg-yellow-100"
+                      >
+                        {
+                          item.concept_name
+                        }
+                      </button>
+                    )
+                  )}
+
+                </div>
+
+              </div>
+            )}
+
             {/* QUIZ */}
 
             {showMockTest && (
@@ -578,15 +651,11 @@ export default function Home() {
 
                 <div className="flex items-center justify-between mb-8">
 
-                  <div>
-
-                    <h2 className="text-3xl font-bold">
-                      {assertionMode
-                        ? "Assertion & Reasoning Test"
-                        : "Mock Test"}
-                    </h2>
-
-                  </div>
+                  <h2 className="text-3xl font-bold">
+                    {assertionMode
+                      ? "Assertion & Reasoning Test"
+                      : "Mock Test"}
+                  </h2>
 
                   <button
                     onClick={() =>
@@ -649,7 +718,6 @@ export default function Home() {
                             </div>
 
                           </div>
-
                         )}
 
                         <div className="space-y-3">
@@ -708,30 +776,53 @@ export default function Home() {
 
                               return (
 
-                                <button
+                                <div
                                   key={
                                     optionIdx
                                   }
-                                  disabled={
-                                    !!selectedOption
-                                  }
-                                  onClick={() =>
-                                    setSelectedAnswers(
-                                      (
-                                        prev: any
-                                      ) => ({
-                                        ...prev,
-                                        [idx]:
-                                          option,
-                                      })
-                                    )
-                                  }
-                                  className={
-                                    buttonClass
-                                  }
                                 >
-                                  {option}
-                                </button>
+
+                                  <button
+                                    disabled={
+                                      !!selectedOption
+                                    }
+                                    onClick={() =>
+                                      setSelectedAnswers(
+                                        (
+                                          prev: any
+                                        ) => ({
+                                          ...prev,
+                                          [idx]:
+                                            option,
+                                        })
+                                      )
+                                    }
+                                    className={
+                                      buttonClass
+                                    }
+                                  >
+                                    {option}
+                                  </button>
+
+                                  {selectedOption &&
+                                    isCorrect && (
+
+                                      <div className="mt-3 bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-gray-700 leading-7">
+
+                                        <strong>
+                                          Explanation:
+                                        </strong>
+
+                                        <p className="mt-2">
+                                          {
+                                            q.explanation
+                                          }
+                                        </p>
+
+                                      </div>
+                                    )}
+
+                                </div>
                               );
                             }
                           )}
@@ -770,7 +861,6 @@ export default function Home() {
                 </div>
 
               </div>
-
             )}
 
             {/* BRIEF EXPLANATION */}
@@ -831,7 +921,6 @@ export default function Home() {
             </div>
 
           </div>
-
         )}
 
       </div>
